@@ -66,6 +66,17 @@ claude mcp add shingu -e SHINGU_ID=학번 -e SHINGU_PW=비밀번호 -- node C:\U
 
 env를 생략하고 아래 설정 파일을 쓰면 `.mcp.json`에 비밀번호를 적지 않아도 됩니다.
 
+### (c) 모든 프로젝트에서 사용하기 (user scope)
+
+프로젝트마다 `.mcp.json`을 두지 않고 어느 디렉터리에서 Claude Code를 열어도 쓰려면 **사용자 범위**로 등록합니다. 자격증명은 아래 `~/.shingu-mcp/config.json`에 두면 명령에 비밀번호를 넣지 않아도 됩니다.
+
+```sh
+claude mcp add --scope user shingu -- node C:/Users/<사용자>/shingu-mcp/dist/index.js
+claude mcp list   # shingu 가 보이면 완료. 제거는 claude mcp remove --scope user shingu
+```
+
+등록 후 새 Claude Code 세션(어느 폴더든)에서 "이번 주 과제 뭐 있어?", "과제 34771 내용 보여줘"처럼 물으면 됩니다.
+
 ## 자격증명 설정
 
 우선순위는 다음과 같습니다.
@@ -89,6 +100,7 @@ Windows에서는 `C:\Users\<사용자>\.shingu-mcp\config.json`입니다.
 | 이름 | 입력 | 반환 | 예상 소요 |
 |---|---|---|---|
 | `get_assignments` | `due_within_days`(선택, 0~365): 지금부터 N일 이내 마감만 | 과목, 제목, 마감, 내 제출 상태 | 7일 범위 약 15초 (첫 호출 로그인 포함) |
+| `get_assignment` | `report_seq`(필수), `lecture_seq`(선택) | 과제 한 건의 본문 전체·첨부파일(이름·다운로드 URL)·제출/연장기한·감점 안내·내 제출 상태 | 약 2초 |
 | `get_timetable` | `week`(선택, `YYYY-MM-DD`): 이 날짜가 속한 주의 날짜를 항목에 붙임 | 요일, 교시, 과목, 교수, 강의실, 날짜 | 약 0.3초 |
 | `get_courses` | `include_contacts`(선택, 기본 false): 교수 연락처 포함 | 수강 과목, 담당 교수 (옵션: 이메일, 전화, 연구실) | 약 1.2초 (연락처 포함 시 과목당 약 7초 추가) |
 | `get_notices` | `category`(`univ`/`scholarship`/`eclass`), `limit`(1~100, 기본 20), `include_eclass`(기본 false) | 공지 목록 (최신순) | 약 0.4초 |
