@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>    
+    <meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Cache-control" content="no-cache">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="신구대학교 학생종합포털">
+<meta name="author" content="SHINGU">
+<link rel="icon" href="/resources/custom/images/main/shingu-symbol.ico"><title>신구대학교 학생종합포털(35)</title>
+    <link rel="stylesheet" href="/resources/custom/css/normalize.min.css" />
+    <link rel="stylesheet" href="/resources/bootstrap/3.3.7/css/bootstrap.css" />
+    <link rel="stylesheet" href="/resources/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+    <link rel="stylesheet" href="/resources/bootstrap-tagsinput/0.6.1/css/bootstrap-tagsinput.css" />
+    
+    <link rel="stylesheet" href="/resources/custom/css/ie10-viewport-bug-workaround.css" />
+    
+    <link rel="stylesheet" href="/resources/custom/css/bootstrap-datetimepicker.min.css" />
+    <link rel="stylesheet" href="/resources/custom/css/bootstrap-select.min.css" />
+    <link rel="stylesheet" href="/resources/custom/css/bootstrap-table.css" />
+
+    <link rel="stylesheet" href="/resources/toastr/2.1.3/css/toastr.css" />
+    <link rel="stylesheet" href="/resources/confirm/1.8.0/css/jquery-confirm.min.css" />
+
+    <link rel="stylesheet" href="/resources/fullcalendar/3.0.1/css/fullcalendar.min.css" />
+    
+    <link rel="stylesheet" href="/resources/jquery-file-upload/css/jquery.fileupload.css" />
+    
+    <link rel="stylesheet" href="/resources/jstree/3.3.1/css/style.css" />
+
+    <link rel="stylesheet" href="/resources/custom/css/core.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.contents.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.table.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.fonts.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.common.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.form.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.input.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.sidebar.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.dashboard.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.modal.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.panel.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.fullcalendar.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.mail.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.widget.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.help.css" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.tinymce.css" /> 
+    
+    <link rel="stylesheet" href="/resources/fullcalendar/3.0.1/css/fullcalendar.print.css" media="print" />
+    <link rel="stylesheet" href="/resources/custom/css/poizn.print.css" media="print" /><!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+    <script src="/resources/html5shiv/3.7.3/js/html5shiv.min.js"></script>
+    <script src="/resources/html5shiv/3.7.3/js/html5shiv-printshiv.min.js"></script>
+    <script src="/resources/respond/1.4.2/js/respond.min.js"></script>
+    <![endif]-->
+    <!--canvas ie 7, 8-->
+    <!--[if IE]>
+    <script src="/resources/rMateChartH5/4.0/js/excanvas.js"></script>
+    <![endif]-->
+    
+    <script src="/resources/jquery/1.12.4/js/jquery-1.12.4.min.js"></script>
+    <script src="/resources/jquery-ui/1.11.4/js/jquery-ui.min.js"></script>
+    <script src="/resources/jquery-ui/1.11.4/js/jquery.ui.touch-punch.min.js"></script>
+    <script src="/resources/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    
+    <script src="/resources/bootstrap-tagsinput/0.6.1/js/bootstrap-tagsinput.js"></script>
+	<script src="/resources/bootstrap3-typeahead/3.1.0/js/bootstrap3-typeahead.min.js"></script>
+
+    <script type="text/javascript" src="/resources/custom/js/moment-with-locales.min.js"></script>
+    <script type="text/javascript" src="/resources/custom/js/moment-kr.js"></script>
+    <script type="text/javascript" src="/resources/custom/js/bootstrap-datetimepicker.min.js"></script>
+
+    <script src="/resources/custom/js/jquery.form.min.js"></script>
+    <script src="/resources/custom/js/jquery.validate.js"></script>
+    <script src="/resources/custom/js/jquery.validate.addMethods.js"></script>
+    <script src="/resources/custom/js/jquery.validate.messages_ko.min.js"></script>
+    <script src="/resources/custom/js/jquery-validate.bootstrap-tooltip.js"></script>
+    <script src="/resources/custom/js/bootstrap-select.js"></script>
+    <script src="/resources/custom/js/bootstrap-select.defaults-ko_KR.min.js"></script>
+    <script src="/resources/custom/js/jquery.fileDownload.js"></script>
+    <script src="/resources/custom/js/jquery.newsTicker.js"></script>
+
+    <script src="/resources/toastr/2.1.3/js/toastr.min.js"></script>
+    <script src="/resources/confirm/1.8.0/js/jquery-confirm.min.js"></script>
+
+    <script src="/resources/fullcalendar/3.0.1/js/fullcalendar.min.js"></script>
+    <script src="/resources/fullcalendar/3.0.1/js/locale/ko.js"></script>
+    
+    <script src="/resources/jquery-file-upload/js/vendor/jquery.ui.widget.js"></script>
+    <script src="/resources/jquery-file-upload/js/jquery.iframe-transport.js"></script>
+    <script src="/resources/jquery-file-upload/js/jquery.fileupload.js"></script>
+    <script src="/resources/jquery-file-upload/js/jquery.fileupload-process.js"></script>
+    <script src="/resources/jquery-file-upload/js/jquery.fileupload-validate.js"></script>
+    
+    <script src="/resources/spin/2.3.2/js/spin.min.js"></script>
+    <script src="/resources/spin/2.3.2/js/jquery.spin.js"></script>
+    
+    <script src="/resources/jstree/3.3.1/js/jstree.min.js"></script>
+    <script src="/resources/printArea/2.4.1/js/jquery.printarea.js"></script>
+    
+    <script src="/resources/custom/js/ie10-viewport-bug-workaround.js"></script>
+    
+    <script src="/resources/custom/js/poizn.common.js"></script>
+    <script src="/resources/custom/js/poizn.menu.js"></script>
+    <script src="/resources/custom/js/poizn.form.js"></script>
+    <script src="/resources/custom/js/poizn.file.js"></script>
+    <script src="/resources/custom/js/poizn.select.ajax.js"></script>
+    <script src="/resources/custom/js/poizn.input.ajax.js"></script>
+    <script src="/resources/custom/js/poizn.checkbox.js"></script>
+    <script src="/resources/custom/js/poizn.org.chart.js"></script>
+    <script src="/resources/custom/js/poizn.mail.js"></script>
+    <script src="/resources/custom/js/poizn.mail.preview.js"></script>
+    <script src="/resources/custom/js/poizn.cmm.code.js"></script>
+    <script src="/resources/netfunnel/netfunnel.js"></script><script type="text/javascript">
+    var bookMarkCheck;
+		$(document).ready(function() {
+			// toastr 위치 변경
+			toastr.options = {
+				positionClass : 'toast-center-center'
+			}
+			
+			$("#master").css("display","");
+            $("#student").css("display","none");
+            $("#taker").css("display","none");
+            
+            $("#memoModal").on("shown.bs.modal", function(){
+                var modal = $(this);
+                var d = modal.data();
+                var li = modal.find(".modal-body").children().children();
+                
+                var url = "/system/setting/helpNote/modal?menuCd="+d.menuCd+"&programCd="+d.programCd;
+                $.poizn.get({
+                    url: url,
+                    beforeSend: function() {
+                        li.first().slideDown("easeInOutExpo");
+                        li.last().slideUp("easeInOutExpo", function() {$(this).empty();});
+                        return true;
+                    },
+                    success: function(data) {
+                        li.first().slideUp("easeInOutExpo");
+                        li.last().queue(function() {
+                            $(this).html(data);
+                            $(this).dequeue();
+                        }).slideDown("easeInOutExpo");
+                    }
+                });
+            }).on("hidden.bs.modal", function(e) {
+            	window.location.reload();
+            });
+            
+            if('0' > 0){
+            	bookMarkCheck = "Y";
+            	$("button[data-role=bookMark]").children().removeClass("fa-star-o").addClass("fa-star");
+            }else{
+            	bookMarkCheck = "N";
+            	$("button[data-role=bookMark]").children().removeClass("fa-star").addClass("fa-star-o");
+            }
+            
+            if('' != ""){
+                var memoHtml = '<div class="row page-contents">';
+                memoHtml += '<div class="col-xs-12 col-sm-12">';
+                memoHtml += '<div class="row memo-box">';
+				memoHtml += '<div class="col-xs-12 col-sm-12">';
+                memoHtml += '<div class="row">';
+                memoHtml += '<div class="col-xs-4 col-sm-2 text-center">';
+                
+                memoHtml += '<img src="/resources/custom/images/sub/icon-note.png" class="note-img" alt="노트 이미지" />';
+                
+                
+                memoHtml += '</div>';
+                if('' != ""){
+                    memoHtml += '<div class="col-xs-8 col-sm-8">';
+                    memoHtml += '<div class="note-box">';
+                    memoHtml += '';
+                    memoHtml += '</div>';
+                    memoHtml += '</div>';
+                    //memoHtml += '<div class="col-xs-12 visible-xs"><hr/></div>';
+                    memoHtml += '<div class="col-xs-12 col-sm-2">';
+                    memoHtml += '<button type="button" data-role="linkUrl" data-url="" data-url-type="" class="btn btn-block btn-second">설명 상세보기</button>';
+                    memoHtml += '</div>';
+                }else{
+                    memoHtml += '<div class="col-xs-8 col-sm-10">';
+                    memoHtml += '<div class="note-box">';
+                    memoHtml += '';
+                    memoHtml += '</div>';
+                    memoHtml += '</div>';
+                }
+                memoHtml += '</div>';
+                memoHtml += '</div>';
+                memoHtml += '</div>';
+				memoHtml += '</div>';
+                memoHtml += '</div>';
+             
+                $("div[id=memoNote]").html('');
+                $("div[id=memoNote]").html(memoHtml);               
+            }else{
+            	
+	                var memoHtml = '<div class="row page-contents">';
+	                memoHtml += '<div class="col-xs-12 col-sm-12">';
+					memoHtml += '<div class="row memo-box">';
+					memoHtml += '<div class="col-xs-12 col-sm-12">';
+	                memoHtml += '<div class="row">';
+	                memoHtml += '<div class="col-xs-4 col-sm-2 text-center">';
+	                memoHtml += '<button type="button" data-role="memo" data-menu-cd="N0103" data-program-cd="04" class="btn btn-block btn-note"><img src="/resources/custom/images/sub/icon-note.png" class="note-img" alt="노트 이미지" /><p>노트 편집</p></button>';
+	                memoHtml += '</div>';
+	                memoHtml += '<div class="col-xs-8 col-sm-10">';
+	                memoHtml += '<div class="note-box">';
+	                memoHtml += '';
+	                memoHtml += '</div>';
+	                memoHtml += '</div>';
+	                memoHtml += '</div>';
+	                memoHtml += '</div>';
+					memoHtml += '</div>';
+	                memoHtml += '</div>';
+	                memoHtml += '</div>';
+	             
+	                $("div[id=memoNote]").html('');
+	                $("div[id=memoNote]").html(memoHtml);
+                
+            }
+
+            $("#sidebar").menu();
+			$("button[data-role=logout]").click(function() {
+				$.confirm({
+    			    theme: 'supervan',
+    			    title: 'LOGOUT',
+    			    content: '로그아웃 하시겠습니까?',
+    			    confirmButton: '확인',
+    			    cancelButton: '취소',
+    			    confirm: function(){
+    			    	document.location.href="/logout";
+    			    },
+    			    cancel: function(){}
+    			});
+				return false;
+			});
+            
+            // 파일 다운로드
+            $("button[data-role=helpNotefileDown]").click(function() {
+                $.fileDownload('/file/download?fileKey=' + $(this).data('fileKey'), {
+                    successCallback: function(url) {
+                        toastr.success('파일을 다운로드 합니다.');
+                    },
+                    failCallback: function(responseHtml, url) {
+                        toastr.error('파일 다운로드에 실패 하였습니다.');
+                    }
+                });
+                return false;
+            });
+            
+            $("button[data-role=saveMemo]").click(function() {
+                var obj = $(this).data();
+
+                tinymce.triggerSave();
+                
+                var content = tinymce.get('content').getContent().replace(/\n/g,"").replace(/'/g,"\"");
+                $("form[name=memoNoteFrm] textarea").val(content);
+                
+                $.poizn.getJson({
+                    url: "/system/setting/updatePageContent",
+                    type: "POST",
+                    data: JSON.stringify($("form[name=memoNoteFrm]").serializeObject()),
+                    success: function(data) {
+//                     	$("#memoModal").modal('hide');
+                    }
+                }); 
+            });     
+            
+            $("button[data-role=bookMark]").click(function() {
+            	
+            	var data = new Object();
+            	data.menuCd = 'N0103';
+            	data.programCd = '04';
+            	
+            	var jsonInfo = JSON.stringify(data);
+                
+                if(bookMarkCheck == 'Y'){
+                    $.poizn.getJson({
+                        url: "/system/setting/bookMark/delete",
+                        type: "POST",
+                        data : jsonInfo,
+                        success: function(data) {
+                        	bookMarkCheck="N";
+                        	$("button[data-role=bookMark]").children().removeClass("fa-star").addClass("fa-star-o");
+                        }
+                    });
+                }else{
+                	$.poizn.getJson({
+                        url: "/system/setting/bookMark/insert",
+                        type: "POST",
+                        data : jsonInfo,
+                        success: function(data) {
+                        	bookMarkCheck="Y";
+                        	$("button[data-role=bookMark]").children().removeClass("fa-star-o").addClass("fa-star");
+                        }
+                    });
+                }
+                 
+            });             
+            
+            $(document).on("click","button[id=bookMarkRemove]",function() {
+                var obj = $(this).data();
+                var data = new Object();
+                data.menuCd = obj.menuCd;
+                data.programCd = obj.programCd;
+                
+                var jsonInfo = JSON.stringify(data);
+             
+                $.poizn.getJson({
+                    url: "/system/setting/bookMark/delete",
+                    type: "POST",
+                    data : jsonInfo,
+                    success: function(data) {
+                        var menuCd = 'N0103';
+                        var programCd = '04';
+                        
+                        if(obj.menuCd == menuCd && obj.programCd == programCd){
+	                        bookMarkCheck="N";
+	                        $("button[data-role=bookMark]").children().removeClass("fa-star").addClass("fa-star-o");
+                        }
+                        
+                        $("a[data-role=bookMarkList]").trigger("click");
+                    }
+                });
+            });
+            
+            $("a[data-role=ssoUrl]").click(function() {
+                var obj = $(this).data();
+                window.open(obj.url, '_blank');
+            });
+            
+            $("a[data-role=menuUrl]").click(function() {
+                var obj = $(this).data();
+    
+                /* if(obj.menuCd.substring(0,1) == "S"){
+                	if(obj.menuCd == "S0110"){
+                	}else{
+	                	window.open(obj.url, '_blank');
+                	}
+                }else{
+                    if(obj.menuCd == "R0103" || obj.menuCd == "L0113"){
+                        window.open(obj.url, '_blank');
+                    }else{
+                        $(location).attr('href',obj.url);
+                    }        	
+                } */
+                $(location).attr('href',obj.url);
+            });
+            
+            $("button[data-role=memo]").click(function() {
+                var obj = $(this).data();
+                $("#memoModal").data("menuCd", obj.menuCd);          
+                $("#memoModal").data("programCd", obj.programCd);
+                $("#memoModal").modal("show");
+            });     
+            
+            $("a[data-role=bookMarkList]").click(function() {
+            	 $.poizn.get({
+                    url: "/system/setting/bookMark/bookMarkList",
+                    success: function(data) {
+                        $("div[id=tab-bookmark]").html(data);
+                    }
+                });          	
+            });    
+            
+            $("a[role=dashboard]").click(function() {
+            	$(location).attr('href',"/dashboard/dashboard");
+            });
+            
+            $("button[data-role=linkUrl]").click(function() {
+                var obj = $(this).data();
+                var linkUrl= obj.url;
+                var linkUrlType = obj.urlType;
+                
+                if(linkUrl != '' && linkUrlType != ''){
+                	if(linkUrlType == 'N'){
+                		window.open(linkUrl);
+                	}else{
+                		//todo 페이지 이동
+                	}
+                }else{
+                	toastr.error("URL 정보가 잘못되었습니다.")
+                }
+
+            });   
+            
+            if("" != "") {
+                if("" == "true") {
+                	if("" != "") toastr.success("");
+                } else {
+                	if("" != "") toastr.error("");
+                }
+            }
+            
+            if("" != "") {
+                if("" == "true") {
+                    if("" != "") toastr.success("");
+                } else {
+                    if("" != "") toastr.error("");
+                }
+            }
+            
+            /*
+        	// 사용자 접속
+            $("button[data-role=orgCharts]").each(function() {
+            	$(this).data('modalOrgChart').on('org.chart.apply', function(event, data) {
+            		$("form[name=reconnecttionFrm] input[name=userNo]").val(data[0].userNo);
+            		$("form[name=reconnecttionFrm]").submit();
+                });
+            });
+        	
+        	// 홈페이지 이동
+        	$("button[data-role=homepage]").click(function(){
+        		location.href = "/";
+        	});
+        	*/
+        	
+         	// [인쇄하기]
+         	$("button[data-role=screenPrint]").click(function(){
+         		var printDiv = $("div.printDivison");
+                printDiv.printArea({
+                    mode: "popup",
+                    popClose: true
+                });
+         	});
+        	
+        	// 푸시버튼
+        	$("button[data-role=pushButton]").click(function(){
+        		showNotification("신구대학교 메세지가 수신 되었습니다.", "신구대학교 알림", "예약 도서 [취업전략] 대출이 가능합니다.");
+        	});
+        	
+        	$("[data-role=office365]").click(function(){
+        		$("#officeFrm").attr("target","office365").submit();
+                //window.open("office365", "office365", "height=500, width=900, menubar=no, scrollbars=yes, resizable=yes, toolbar=no, status=no, left=50, top=50");
+        	});
+        	
+        	$("[data-role=receiveList]").click(function(){
+        		window.location.href="/alarm/recv/list";
+        	}); 
+		});
+		
+		function showNotification(ticket, title, text) {
+	        Android.showNotification(ticket, title, text);
+	    }
+
+		$(function(){
+			var state = true;
+			//$("button[data-role=helpBox]")
+			$("button.btn-help").on("click", function() {
+				if (state) {
+					$(this).parent().parent().parent().find(".help-box").animate({right: 0}, 400);
+					$(this).find(".fa-question-circle").switchClass("fa-question-circle", "fa-times", 0);
+				} else {
+					$(this).parent().parent().parent().find(".help-box").animate({right: -301}, 400);
+					$(this).find(".fa-times").switchClass("fa-times", "fa-question-circle", 0);
+				}
+				state = !state;
+			});
+		});
+		
+		function checkSession(){
+			$.poizn.getJson({
+   				url: "/sessionCheck",
+   				type: "get",
+   				dataType: "json",
+   				success: function(data) {
+   					if(data.nextAction == "LOGIN_A") {
+   						reSSOLogin();
+   					} else if(data.nextAction == "OUT_A") {
+   						toastr.warning("세션이 종료되어 통합로그인으로 이동합니다.");
+   						setTimeout(function () {
+	    					window.location.href="https://login.shingu.ac.kr";
+   						}, 2000);
+   					}else if(data.nextAction == "OUT_B") {
+   						toastr.warning("세션이 종료되어 통합로그인으로 이동합니다.");
+   						setTimeout(function () {
+   							window.location.href="/logout";
+   						}, 2000);
+   					} 
+   				}
+			});
+		}
+		
+		function reSSOLogin(){
+			$.poizn.getJson({
+   				url: "/reSSOLogin",
+   				type: "get",
+   				dataType: "json",
+   				success: function(data) {
+   					
+   				}
+			});
+		} 
+    </script>
+    
+    
+	    <script type="text/javascript">
+	    	$(document).ready(function(){
+	    		$("select").selectAjax(function(){});
+	    		
+	    		// 학생검색버튼 클릭
+	    		$("button[data-role=searchStudentBtn]").click(function(){
+	    			var hagbeon = $("form[name=searchForm] input[name=Hagbeon]").val().trim();
+	    			var nm = $("form[name=searchForm] input[name=Nm]").val().trim();
+	    			
+	    			if(hagbeon == '' && nm == ''){
+	    				toastr.error("학번, 성명 중 1개이상 조건을 입력하세요.");
+	    				return false;
+	    			}
+	    			
+	    			if(hagbeon != '' && hagbeon.length < 6){
+	    				toastr.error("학번은 최소 6자리 이상 입력하셔야 합니다.");
+	    				return false;
+	    			}
+	    			
+	    			if(nm != '' && nm.length == 1){
+	    				toastr.error("성명은 두글자 이상 입력하세요.");
+	    				return false;
+	    			}
+	    			
+	    			$.poizn.getJson({
+	    				url: "/COR/CORZ05SD1",
+	    				data: $("form[name=searchForm]").serialize(),
+	    				success: function(d){
+	    					if(d.length == 0){
+	    						toastr.error("검색결과가 없습니다.");
+	    					} else if (d.length == 1){
+	    						$("form[name=searchForm] input[name=Hagbeon]").val(d[0].hagbeon);
+	    						$("form[name=searchForm]").submit();
+	    					} else if (d.length > 1){
+	    						$(".results-list").empty();
+                				$.each(d, function(idx, item){
+                                    var $li = $("<li>");
+                                    $li.append("<a href='#' data-role='selectStudent' data-no='" + $.trim(item.hagbeon) + "'>" + item.sosogNm + " / " + item.hagbeon + " / " + item.nm + "</a>");
+                                    $(".results-list").append($li);
+                                    $(".search-results").show();
+                				});
+	    					}
+	    				}
+	    			});
+	    		});
+	    		
+	    		// 검색결과 - 학생 선택
+	    		$(document).on("click", "a[data-role=selectStudent]", function(){
+	    			$("input[name=Hagbeon]").val($(this).data("no"));
+    				$("form[name=searchForm]").submit();
+	    		});
+	    		
+	    		// 설문지 모달
+	    		$("#queModal").on("shown.bs.modal", function(e){
+	    			var modal = $(this);
+	    			var data = $(e.relatedTarget).data();
+	    			var li = modal.find(".modal-body").children().children();
+	    			var d = new Object();
+	    			d.yy = data.yy;
+	    			d.haggi = data.haggi;
+	    			d.gwamogCd = data.gwamogCd;
+	    			d.gaeseolSosogCd = data.gaeseolSosogCd;
+	    			d.hagnyeon = data.hagnyeon;
+	    			d.bunban = data.bunban;
+	    			d.gbn = data.gbn;
+	    			d.hagbeon = "2000000000";
+	    			
+	    			$.poizn.get({
+	    				url: "/SSJ/SSJ018P/SSJ018P1",
+	    				data: d,
+	    				beforeSend: function() {
+	    					li.first().slideDown("easeInOutExpo");
+	    					li.last().slideUp("easeInOutExpo", function() {$(this).empty();});
+	    					return true;
+	    				},
+	    				success: function(data) {
+	    					li.first().slideUp("easeInOutExpo");
+	    					li.last().queue(function() {
+	    						$(this).html(data);
+	    						$(this).dequeue();
+	    					}).slideDown("easeInOutExpo");
+	    				}
+	    			});
+	    		});
+	    		
+	    		// 설문작성 모달 - [저장]
+                $("button[data-role=quesSaveBtn]").click(function(){
+                	if($("form[name=answerForm]").length == 0){
+                		toastr.error("설문을 불러와주세요.");
+                		return false;
+                	}
+                	
+                    // validate
+                    var validateFlag = true;
+                    $(".ques").each(function(index, item){
+                        if($(this).find("input:checked").length == 0){
+                            validateFlag = false;
+                        }
+                    });
+                    
+                    if(!validateFlag){
+                        toastr.error("응답하지 않은 설문이 있습니다.");
+                        return false;
+                    }
+                    
+                    var selTargets = [];
+                    $(".ques").each(function(index, item){
+                        if($(this).find("input:checked").length != 0){
+                            var target = $(this).find("input:checked").attr("name") + "|" + $(this).find("input:checked").val();
+                            selTargets.push(target);
+                        }
+                    });       
+                    
+                    $("form[name=answerForm] input[name=answer]").val(selTargets);
+                    
+                    $.confirm({
+                        theme: 'supervan',
+                        title: '설문저장',
+                        content: '저장후에는 수정이 불가능합니다. 저장하시겠습니까?',
+                        confirmButton: '예',
+                        cancelButton: '아니오',
+                        confirm: function(){
+                            $("form[name=answerForm]").submit();
+                        },
+                        cancel: function(){}
+                    });
+                });
+
+	    		// 성적이의신청 모달
+	    		$("#objModal").on("shown.bs.modal", function(e){
+	    			document.querySelector('[data-role=objDeleteBtn]').style.display="none";
+	    			var ijYn = "0";
+	    			if(ijYn == "1") {
+		    			var modal = $(this);
+		    			var data = $(e.relatedTarget).data();
+		    			var li = modal.find(".modal-body").children().children();
+		    			var d = new Object();
+		    			d.yy = data.yy;
+		    			d.haggi = data.haggi;
+		    			d.gwamogCd = data.gwamogCd;
+		    			d.gaeseolSosogCd = data.gaeseolSosogCd;
+		    			d.hagnyeon = data.hagnyeon;
+		    			d.bunban = data.bunban;
+		    			d.gbn = data.gbn;
+		    			d.hagbeon = "2000000000";
+		    			
+		    			$.poizn.get({
+		    				url: "/SSJ/SSJ018P/SSJ018P2",
+		    				data: d,
+		    				beforeSend: function() {
+		    					li.first().slideDown("easeInOutExpo");
+		    					li.last().slideUp("easeInOutExpo", function() {$(this).empty();});
+		    					return true;
+		    				},
+		    				success: function(data) {
+		    					li.first().slideUp("easeInOutExpo");
+		    					li.last().queue(function() {
+		    						$(this).html(data);
+		    						$(this).dequeue();
+		    					}).slideDown("easeInOutExpo");
+		    				}
+		    			});	    				
+	    			} else {
+	    				alert("성적 이의신청 기간이 아닙니다.");
+	    				$("#objModal").modal('hide');
+	    			}
+	    		});
+	    		
+	    		// 성적이의신청 모달 - [저장]
+                $("button[data-role=objSaveBtn]").click(function(){
+                    if($("form[name=applyForm] textarea[name=sayoo]").val().trim() == ""){
+                    	toastr.error("사유를 입력해주세요.");
+                    	return false;
+                    }
+                    
+                    var time = parseInt($("form[name=applyForm] input[name=now]").val());
+                    if(time < 9 || time > 18){
+                    	toastr.error("성적이의신청은 9시부터 18시까지 가능합니다.");
+                    	return false;
+                    }
+                    
+                    $.confirm({
+                        theme: 'supervan',
+                        title: '성적이의신청',
+                        content: '저장하시겠습니까?',
+                        confirmButton: '예',
+                        cancelButton: '아니오',
+                        confirm: function(){
+                        	document.querySelector("form[name=applyForm]").action="/SSJ/SSJ018P/SSJ018P2D1";
+                            $("form[name=applyForm]").submit();
+                        },
+                        cancel: function(){}
+                    });
+                });
+	    		
+	    		// 성적이의신청 모달 - [삭제]
+                $("button[data-role=objDeleteBtn]").click(function(){                    
+                    $.confirm({
+                        theme: 'supervan',
+                        title: '성적이의신청',
+                        content: '삭제하시겠습니까?',
+                        confirmButton: '예',
+                        cancelButton: '아니오',
+                        confirm: function(){
+                        	
+                        	document.querySelector("form[name=applyForm]").action="/SSJ/SSJ018P/SSJ018P2D2";
+                            $("form[name=applyForm]").submit();
+                        },
+                        cancel: function(){}
+                    });
+                });	    		
+	    	});
+	    </script>
+	
+    <style type="text/css">
+    	.pushContent { 
+    		display: inline-block; 
+	    	width: 200px; 
+	    	white-space: nowrap; 
+	    	overflow: hidden; 
+	    	text-overflow: ellipsis; 
+    	}
+ 
+    </style>
+</head>
+
+<body>
+	<!--<form name="officeFrm" id="officeFrm" action="https://shingu.sbcloud-edu.net/ASP2/default.aspx" method="POST"> -->
+	<form name="officeFrm" id="officeFrm" action="https://o365.co.kr/ASP2/default.aspx" method="POST">	
+		<input type="hidden" name="acs_key" value="8cfa50a1-6d3c-4578-894e-b16480d91301" />
+		<input type="hidden" name="IsPro" value="true" />
+		<input type="hidden" name="job_title" value="2" />
+		<input type="hidden" name="scl_login_id" value="2000000000" />
+	</form>
+	<script>
+/*	function ai_go2022_1(){
+	
+		document.aintroForm.submit();
+	}*/
+	</script>
+	<nav class="navbar navbar-fixed-top" data-role="navtop" data-no-print>
+      <div class="container-fluid clearfix">
+        <div class="navbar-header pull-left">
+          <button id="sidebarButton" data-target="#sidebar" type="button" class="btn btn-top-menu pull-left hidden-lg"><span class="glyphicon glyphicon-menu-hamburger"></span></button>
+		  <a class="navbar-brand hidden-lg" href="/dashboard/dashboard">
+			  <h1><img src="/resources/custom/images/main/top-symbol-white.png" alt="신구대학교 학생포털시스템"></h1>
+		  </a>
+        </div>
+	    <div id="navbar" class="pull-right">
+          <ul class="nav">
+            <li class="hidden-xs">
+            	<ul class="top-site-link">
+            		<!--<form method="post" name="aintroForm" id="aintroForm" action="http://www.aintro.io/common/login/schoolLogin.do" target=_blank>
+    <input type="hidden" name="schlId" value="SCH000000004" />
+    <input type="hidden" name="stuId" value="2000000000" />
+    <input type="hidden" name="stuName" value="홍길동" />
+    <input type="hidden" name="stuDeptName" value="게임콘텐츠과 " />
+</form>
+<form method="post" name="infaceForm" id="infaceForm" action="https://inface.ai/shingu"  target=_blank>
+<input type="hidden" name="SetupNo" value="239" />
+<input type="hidden" name="UserID" value="2000000000" />
+<input type="hidden" name="UserName" value="홍길동" />
+<input type="hidden" name="UserMajor" value="게임콘텐츠과 " />
+</form>
+-->
+<script type="text/javascript">
+<!--
+//취업솔루션 로그인
+//function infaceLogin(){
+//document.infaceForm.submit();
+//}
+//-->
+</script>
+		<!--<li><a href="javascript:ai_go2022_1();" >AI 자기소개서</a></li>
+		<li><a href="javascript:infaceLogin();" >AI 면접</a></li>-->
+		
+          <!-- 학생여부 -->
+			 
+				<li><a href="https://gate.shingu.ac.kr/page/ssoLogin" target="_blank" >근로장학</a></li>
+		      
+		  <li><a href="https://itld.shingu.ac.kr/cms/FR_CON/index.do?MENU_ID=240 " target="_blank" >온라인강의(Q&A)</a></li>
+					<li>
+						<a href="https://www.shingu.ac.kr/html/gsuite.html" target="_blank" >G-메일</a>
+					</li>
+					<li>
+						<a href="https://lms.shingu.ac.kr/sso/sso.php" target="_blank">사이버캠퍼스</a>
+					</li>
+					<li>
+						<a href="https://cms.shingu.ac.kr/modules/shingu/sso/loginCheck.php" target="_blank">비교과시스템</a>
+					</li>
+					<li>
+						<a href="https://we.shingu.ac.kr/login.do" target="_blank">현장실습</a>
+					</li>
+					<li>
+						<a href="https://shingu.certpia.com/" target="_blank">인터넷증명발급</a>
+					</li>
+					<li>
+						<a href="#" data-role="office365">Office365</a>
+					</li>
+					
+
+            	</ul>
+            </li>
+            <li class="hidden-xs hidden-sm">
+				<div class="preview-box">
+                <img
+                       class="preview-photo" 
+                       src="https://filenas.shingu.ac.kr/smart-files/HagSa/Sajin/2026/2000000000.jpg"
+                       onError='this.src="/resources/custom/images/main/navbar-user.png"'
+                       alt="preview photo"
+                   />			
+				</div>
+			</li>
+		    <li class="hidden-xs">
+	            <p class="navbar-profile">
+	            	<small>
+	            		
+	            				학생
+	            			</small> 
+	            	<a href="/SHJ/SHJ127P/SHJ127P">
+	            				홍길동</a>	
+	            		</p>
+            </li>
+            <li class="btn-list">
+		    	<button class="nav-comment-num" role="button" data-toggle="modal" data-target="#pushModal">
+		    		
+		    			0 
+		    		</button>
+				<button class="nav-bell" role="button" data-toggle="modal" data-target="#pushModal">알림</button>
+			</li>
+		    <li class="btn-list hidden-xs"><button class="nav-btn nav-logout" type="button" data-role="logout" title="로그아웃">로그아웃</button></li>
+		    <li class="btn-list-xs nav-btn-xs">
+		    	<button href="#" class="btn btn-top-menu dropdown-toggle" data-toggle="dropdown" role="button" id="dropdown-link"><span class="glyphicon glyphicon-option-vertical" aria-hidden="true"></span></button>
+		    	<ul class="dropdown-menu " aria-labelledby="dropdown-link">
+		    		<li><a href="https://gate.shingu.ac.kr/page/ssoLogin" target="_blank" >근로장학</a></li>
+          <li><a href="https://itld.shingu.ac.kr/cms/FR_CON/index.do?MENU_ID=240 " target="_blank" >온라인강의(Q&A)</a></li>
+					<li><a href="https://gsl.shingu.ac.kr/session/sso/goGS.do" target="_blank" >G-메일</a></li>
+					<li>
+						<a href="https://lms.shingu.ac.kr/sso/sso.php" target="_blank">사이버캠퍼스</a>
+					</li>
+					<li>
+						<a href="https://we.shingu.ac.kr/login.do" target="_blank">현장실습</a>
+					</li>
+					<li>
+						<a href="https://shingu.certpia.com/" target="_blank">인터넷증명발급</a>
+					</li>
+					<li>
+						<a href="#" data-role="office365">Office365</a>
+					</li>
+					
+					<li class="mt10 pr5 pl5">
+						<button class="btn btn-block btn-xs btn-primary" type="button" data-role="logout" title="로그아웃">로그아웃</button>
+					</li>
+				</ul>
+		    </li>
+          </ul>
+		</div>
+      </div>
+    </nav>
+	<div class="sidebar" id="sidebar" data-target="#sidebarButton" data-no-print>
+			
+			<div id="left-meun">
+				<div class="left-meun-symbol visible-lg">
+					<a href="/dashboard/dashboard">
+						<h1><img src="/resources/custom/images/main/top-symbol-white.png" alt="신구대학교 학생포털시스템"></h1>
+					</a>
+				</div>
+				<div class="left-meun-symbol-mb visible-lg"></div>
+				<div class="left-tab-menu">
+					<ul class="nav nav-tabs nav-justified" role="tablist">
+					    <li role="presentation" class="active"><a href="#tab-leftmenu" role="tab" data-toggle="tab">전체메뉴</a></li>
+					    <li role="presentation"><a href="#tab-bookmark" role="tab" data-toggle="tab" data-role="bookMarkList">즐겨찾기</a></li>
+					</ul>
+				</div>
+				<div class="tab-content" id="tab-leftmenu-area">
+				    <div role="tabpanel" class="tab-pane active" id="tab-leftmenu">
+						<ul class="left-meun-depth-1">							
+							<li
+									>  
+									<a href="#right-menu-0"
+												title="학적"
+												data-menu-cd="L01" role="tab"
+												data-toggle="collapse"
+												data-parent="#tab-leftmenu"
+												data-manager-yn="N"
+												data-index="0"
+												aria-expanded="false" 
+											    aria-controls="right-menu-0">
+												학적</a>
+										<div id="right-menu-0" class="collapse">
+												<ul class="left-meun-depth-2">
+															<li id="li_menu_L0101" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SHJ/SHJ003P/SHJ003P" data-menu-cd="L0101" title="학적부조회" aria-expanded="false" >
+																			학적부조회</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_L0102" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SHJ/SHJ127P/SHJ127P" data-menu-cd="L0102" title="학생카드" aria-expanded="false" >
+																			학생카드</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_L0103" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SHJ/SHJ149R/SHJ149R" data-menu-cd="L0103" title="전입학과학점인정조회" aria-expanded="false" >
+																			전입학과학점인정조회</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_L0104" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SHJ/SHJ158P/SHJ158P" data-menu-cd="L0104" title="전과결과조회" aria-expanded="false" >
+																			전과결과조회</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_L0105" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SHJ/SHJ191R/SHJ191R" data-menu-cd="L0105" title="복학신청원" aria-expanded="false" >
+																			복학신청원</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_L0106" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SHJ/SHJ220P/SHJ220P" data-menu-cd="L0106" title="온라인복학신청" aria-expanded="false" >
+																			온라인복학신청</a>
+																	</li>
+																</ul>
+													</div>
+										</li>
+							<li
+									>  
+									<a href="#right-menu-1"
+												title="수업"
+												data-menu-cd="M01" role="tab"
+												data-toggle="collapse"
+												data-parent="#tab-leftmenu"
+												data-manager-yn="N"
+												data-index="1"
+												aria-expanded="false" 
+											    aria-controls="right-menu-1">
+												수업</a>
+										<div id="right-menu-1" class="collapse">
+												<ul class="left-meun-depth-2">
+															<li id="li_menu_M0101" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SSE/SSE012R/SSE012R" data-menu-cd="M0101" title="강의실 시간표 조회" aria-expanded="false" >
+																			강의실 시간표 조회</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_M0102" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SSE/SSE013R/SSE013R" data-menu-cd="M0102" title="개인 시간표 조회" aria-expanded="false" >
+																			개인 시간표 조회</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_M0103" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SSE/SSE015R/SSE015R" data-menu-cd="M0103" title="학과 시간표 조회" aria-expanded="false" >
+																			학과 시간표 조회</a>
+																	</li>
+																</ul>
+													</div>
+										</li>
+							<li
+									 class="active"
+									>  
+									<a href="#right-menu-2"
+												title="수강/성적"
+												data-menu-cd="N01" role="tab"
+												data-toggle="collapse"
+												data-parent="#tab-leftmenu"
+												data-manager-yn="N"
+												data-index="2"
+												aria-expanded="true" 
+											    aria-controls="right-menu-2">
+												수강/성적<span class="sr-only">(current)</span>
+												</a>
+										<div id="right-menu-2" class="collapse">
+												<ul class="left-meun-depth-2">
+															<li id="li_menu_N0101" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SSG/SSG004P/SSG004P" data-menu-cd="N0101" title="수강신청" aria-expanded="false" >
+																			수강신청</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_N0102" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SSG/SSG005P/SSG005P" data-menu-cd="N0102" title="이수예정학점조회" aria-expanded="false" >
+																			이수예정학점조회</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_N0103" 
+																		class="active">
+																		<a href="#" data-role="menuUrl" data-url="/SSJ/SSJ018P/SSJ018P" data-menu-cd="N0103" title="성적조회(수강자료)" aria-expanded="true" >
+																			성적조회(수강자료)<span class="sr-only">( )</span>
+																			</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_N0104" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SSJ/SSJ019P/SSJ019P" data-menu-cd="N0104" title="성적조회(확정성적)" aria-expanded="false" >
+																			성적조회(확정성적)</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_N0105" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SSJ/SSJ038P/SSJ038P" data-menu-cd="N0105" title="학업성적표" aria-expanded="false" >
+																			학업성적표</a>
+																	</li>
+																</ul>
+													</div>
+										</li>
+							<li
+									>  
+									<a href="#right-menu-3"
+												title="등록/장학"
+												data-menu-cd="O01" role="tab"
+												data-toggle="collapse"
+												data-parent="#tab-leftmenu"
+												data-manager-yn="N"
+												data-index="3"
+												aria-expanded="false" 
+											    aria-controls="right-menu-3">
+												등록/장학</a>
+										<div id="right-menu-3" class="collapse">
+												<ul class="left-meun-depth-2">
+															<li id="li_menu_O0101" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SDL/SDL013P/SDL013P" data-menu-cd="O0101" title="개별수납내역조회" aria-expanded="false" >
+																			개별수납내역조회</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_O0102" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SDL/SDL048R/SDL048R" data-menu-cd="O0102" title="교육비납입증명서" aria-expanded="false" >
+																			교육비납입증명서</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_O0103" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SJH/SJH003R/SJH003R" data-menu-cd="O0103" title="장학증서" aria-expanded="false" >
+																			장학증서</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_O0104" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SDL/SDL016R/SDL016R" data-menu-cd="O0104" title="등록금고지서" aria-expanded="false" >
+																			등록금고지서</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_O0105" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SDL/SDL075P/SDL075P" data-menu-cd="O0105" title="등록금분납신청" aria-expanded="false" >
+																			등록금분납신청</a>
+																	</li>
+																</ul>
+													</div>
+										</li>
+							<li
+									>  
+									<a href="#right-menu-4"
+												title="취업"
+												data-menu-cd="V01" role="tab"
+												data-toggle="collapse"
+												data-parent="#tab-leftmenu"
+												data-manager-yn="N"
+												data-index="4"
+												aria-expanded="false" 
+											    aria-controls="right-menu-4">
+												취업</a>
+										<div id="right-menu-4" class="collapse">
+												<ul class="left-meun-depth-2">
+															<li id="li_menu_V0101" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/DCE/DCE005S/DCE005S" data-menu-cd="V0101" title="채용공고조회" aria-expanded="false" >
+																			채용공고조회</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_V0102" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/DCE/DCE012P/DCE012P" data-menu-cd="V0102" title="실시간취업자등록" aria-expanded="false" >
+																			실시간취업자등록</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_V0103" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/DCE/DCE066R/DCE066R" data-menu-cd="V0103" title="확인서" aria-expanded="false" >
+																			확인서</a>
+																	</li>
+																</ul>
+													</div>
+										</li>
+							<li
+									>  
+									<a href="#right-menu-5"
+												title="상담"
+												data-menu-cd="W01" role="tab"
+												data-toggle="collapse"
+												data-parent="#tab-leftmenu"
+												data-manager-yn="N"
+												data-index="5"
+												aria-expanded="false" 
+											    aria-controls="right-menu-5">
+												상담</a>
+										<div id="right-menu-5" class="collapse">
+												<ul class="left-meun-depth-2">
+															<li id="li_menu_W0101" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SSD/SSD001P/SSD001P" data-menu-cd="W0101" title="상담신청" aria-expanded="false" >
+																			상담신청</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_W0102" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SSD/SSD014P/SSD014P" data-menu-cd="W0102" title="상담내역" aria-expanded="false" >
+																			상담내역</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_W0103" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/ADM/AMBTI/MBTI03P/MBTI03P" data-menu-cd="W0103" title="MBTI결과" aria-expanded="false" >
+																			MBTI결과</a>
+																	</li>
+																</ul>
+													</div>
+										</li>
+							<li
+									>  
+									<a href="#right-menu-6"
+												title="나의이력"
+												data-menu-cd="Q01" role="tab"
+												data-toggle="collapse"
+												data-parent="#tab-leftmenu"
+												data-manager-yn="N"
+												data-index="6"
+												aria-expanded="false" 
+											    aria-controls="right-menu-6">
+												나의이력</a>
+										<div id="right-menu-6" class="collapse">
+												<ul class="left-meun-depth-2">
+															<li id="li_menu_Q0101" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/DCE/DCE008P/DCE008P" data-menu-cd="Q0101" title="포트폴리오(이력서)" aria-expanded="false" >
+																			포트폴리오(이력서)</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_Q0104" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/SHS/SHS037R/SHS037R" data-menu-cd="Q0104" title="자원봉사활동확인서" aria-expanded="false" >
+																			자원봉사활동확인서</a>
+																	</li>
+																</ul>
+													<ul class="left-meun-depth-2">
+															<li id="li_menu_Q0106" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="https://gate.shingu.ac.kr/dashboard/gate" data-menu-cd="Q0106" title="학생통합이력관리시스템" aria-expanded="false" >
+																			학생통합이력관리시스템</a>
+																	</li>
+																</ul>
+													</div>
+										</li>
+							<li
+									>  
+									<a href="/eclass/home">
+												E클래스</a>
+										<div id="right-menu-7" class="collapse">
+												</div>
+										</li>
+							<li
+									>  
+									<a href="/ncs/home">
+												NCS</a>
+											</li><li>
+											<a href="/restaurant/home">
+												학생식당메뉴조회
+												</a>
+										<div id="right-menu-8" class="collapse">
+												</div>
+										</li>
+							<li
+									>  
+									<a href="#right-menu-9"
+												title="PUSH 알림"
+												data-menu-cd="U01" role="tab"
+												data-toggle="collapse"
+												data-parent="#tab-leftmenu"
+												data-manager-yn="N"
+												data-index="9"
+												aria-expanded="false" 
+											    aria-controls="right-menu-9">
+												PUSH 알림</a>
+										<div id="right-menu-9" class="collapse">
+												<ul class="left-meun-depth-2">
+															<li id="li_menu_U0106" 
+																		>
+																		<a href="#" data-role="menuUrl" data-url="/alarm/recv/list" data-menu-cd="U0106" title="PUSH수신함" aria-expanded="false" >
+																			PUSH수신함</a>
+																	</li>
+																</ul>
+													</div>
+										</li>
+							</ul>
+					</div>
+				    <div role="tabpanel" class="tab-pane" id="tab-bookmark">
+				    </div>
+				  </div>
+			
+			</div><!-- / #left-meun -->
+			
+		
+	</div>
+    
+	<div class="container-fluid printDivison" data-role="contents">
+
+		<!-- content top nav -->
+		<div class="breadcrumb clearfix">
+			<ol class="breadcrumb pull-left" data-no-print>
+				<li><i class="fa fa-home" aria-hidden="true"></i></li>
+				<li>수강/성적</li>
+				<li>성적조회(수강자료)</li>
+				</ol>
+			<div class="pull-right mr10">
+				<button type="button" class="btn btn-breadcrumb" data-role="screenPrint"><i class="fa fa-print" aria-hidden="true"></i></button>
+				<button type="button" class="btn btn-breadcrumb" data-role="bookMark"><i class="fa fa-star-o" aria-hidden="true"></i></button>
+				<button type="button" class="btn btn-breadcrumb" data-role=""></button> 
+			</div>
+		</div>
+
+		<!-- !content top nav -->
+		
+		
+		<div class="page-header" role="alert">
+			<h3 class="mt5 pt0">성적조회(수강자료)</h3>
+		</div>
+		<div class="row page-contents">
+			<div class="row">
+				<div class="col-xs-12 col-sm-3 col-md-3">
+					<div class="panel">
+						<div class="panel-heading">
+							My Profile
+						</div>
+						<div class="panel-body">
+							<div class="my-profile">
+					  			<div class="my-profile-photo">
+					  				<img src="https://filenas.shingu.ac.kr/smart-files/HagSa/Sajin/2026/2000000000.jpg" alt="학생사진" onerror="this.src='/resources/custom/images/main/dashboard-photo-none.png'">
+					  			</div>
+					  			<ul class="my-profile-list">
+						  			<li><strong>학번</strong>2000000000</li>
+						  			<li><strong>성명</strong>홍길동</li>
+						  			<!--<li><strong>생년월일</strong></li>-->
+						  			<li><strong>학과</strong>게임콘텐츠과 </li>
+						  			<li><strong>학년/반</strong>1학년 B반</li>
+						  			<!--<li><strong>핸드폰</strong></li>-->
+						  			<!--<li><strong>이메일</strong></li>-->
+						  			<li><strong>최종학적</strong>입학&nbsp;2026.90.00</li>
+						  		</ul>
+						  		<a href="/SJH/PNT014R/PNT014R" class="btn btn-block btn-primary" title="나의이력현황">나의이력현황</a>
+						  		<a href="/DCE/DCE008P/DCE008P" class="btn btn-block btn-primary" title="포트폴리오">포트폴리오</a>
+					  		</div>
+						</div><!-- // panel-body -->
+					</div><!-- // panel -->
+				</div><!-- // col-xs-12 col-sm-3 col-md-3 -->
+ 				<div class="col-xs-12 col-sm-9 col-md-9">  
+					<div class="panel">
+						<div class="panel-body">
+							<div class="table-responsive">
+								<table class="table table-list table-center">
+									<colgroup>
+										<col width="12%">
+										<col width="28%">
+										<col width="12%">
+										<col width="12%">
+										<col width="12%">
+										<col width="12%">
+										<col width="12%">
+									</colgroup>
+									<thead>
+										<tr>
+											<th>년도/학기</th>
+											<th>과목정보</th>
+											<th>점수</th>
+											<th>성적등급</th>
+											<th>이전과목<br />년도학기</th>
+											<th>이전과목<br />과목명</th>
+											<th>연락처확인<br />강의평가</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+												<td>2026 / 2</td>
+												<td class="text-left">
+													생활영어(II) / 00263 / 102<br />
+													교선 / 2 / 정교수</td>
+												<td>
+													
+															성적미완료
+														</td>
+												<td>
+													</td>
+												<td></td>
+												<td></td>
+												<td>
+													<a href="/SHJ/SHJ127P/SHJ127P" class="btn btn-primary btn-xs">연락처 수정</a>
+														</td>
+											</tr>
+										<tr>
+												<td>2026 / 2</td>
+												<td class="text-left">
+													UI화면설계 / 16010 / 102<br />
+													전선 / 3 / 이교수</td>
+												<td>
+													
+															성적미완료
+														</td>
+												<td>
+													</td>
+												<td></td>
+												<td></td>
+												<td>
+													<a href="/SHJ/SHJ127P/SHJ127P" class="btn btn-primary btn-xs">연락처 수정</a>
+														</td>
+											</tr>
+										<tr>
+												<td>2026 / 2</td>
+												<td class="text-left">
+													셀프디자인(자기개발성공전략) / 35578 / 102<br />
+													교선 / 2 / 조교수</td>
+												<td>
+													
+															성적미완료
+														</td>
+												<td>
+													</td>
+												<td></td>
+												<td></td>
+												<td>
+													<a href="/SHJ/SHJ127P/SHJ127P" class="btn btn-primary btn-xs">연락처 수정</a>
+														</td>
+											</tr>
+										<tr>
+												<td>2026 / 2</td>
+												<td class="text-left">
+													게임디자인기초 / 35619 / 102<br />
+													전선 / 3 / 박교수</td>
+												<td>
+													
+															성적미완료
+														</td>
+												<td>
+													</td>
+												<td></td>
+												<td></td>
+												<td>
+													<a href="/SHJ/SHJ127P/SHJ127P" class="btn btn-primary btn-xs">연락처 수정</a>
+														</td>
+											</tr>
+										<tr>
+												<td>2026 / 2</td>
+												<td class="text-left">
+													게임그래픽응용 / 36109 / 102<br />
+													전선 / 3 / 최교수</td>
+												<td>
+													
+															성적미완료
+														</td>
+												<td>
+													</td>
+												<td></td>
+												<td></td>
+												<td>
+													<a href="/SHJ/SHJ127P/SHJ127P" class="btn btn-primary btn-xs">연락처 수정</a>
+														</td>
+											</tr>
+										<tr>
+												<td>2026 / 2</td>
+												<td class="text-left">
+													게임엔진응용 / 36116 / 102<br />
+													전선 / 3 / 강교수</td>
+												<td>
+													
+															성적미완료
+														</td>
+												<td>
+													</td>
+												<td></td>
+												<td></td>
+												<td>
+													<a href="/SHJ/SHJ127P/SHJ127P" class="btn btn-primary btn-xs">연락처 수정</a>
+														</td>
+											</tr>
+										<tr>
+												<td>2026 / 2</td>
+												<td class="text-left">
+													게임프로젝트응용 / 36121 / 102<br />
+													전선 / 3 / 김교수</td>
+												<td>
+													
+															성적미완료
+														</td>
+												<td>
+													</td>
+												<td></td>
+												<td></td>
+												<td>
+													<a href="/SHJ/SHJ127P/SHJ127P" class="btn btn-primary btn-xs">연락처 수정</a>
+														</td>
+											</tr>
+										</tbody>
+								</table>
+							</div><!-- // table-responsive -->
+							<div class="row">
+								<div class="col-xs-12">
+									<div class="sign">	
+									※ 공고된 성적을 확인하기 위해서는 <B>강의평가 기간내</B>에 꼭 강의평가를 완료하셔야만 성적을 확인하실 수 있습니다.
+									<BR>
+									※ <B>계절학기는</B> 강의평가 없이 성적확인이 가능합니다.
+									<!--			※ 성적 확인 및 이의기간 종료(2018.90.00.)로 강의평가 미실시 학생은 학과를 통해 성적을 확인하시기 바랍니다. 
+												최종 확정 성적 및 전체 학기 합산성적은 2019년 1월 4일(금) 오픈될 예정입니다.
+										-->		
+									</div>
+								</div>
+							</div>
+						</div><!-- // panel-body -->
+					</div><!-- // panel -->
+				</div><!-- // col-xs-12 col-sm-9 col-md-9 -->
+			</div><!-- // row -->
+		</div><!-- // row page-contents -->
+		<!-- #queModal -->
+		<div id="queModal" class="modal fade" role="dialog" aria-labelledby="queModal">
+			<div class="modal-dialog modal-lg">
+				<div class="modal-content">
+					<div class="modal-header modal-color-dark-grey">
+						<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+						<h4 class="modal-title">설문지등록</h4>
+					</div>
+					<div class="modal-body">
+						<ul class="list-unstyled" data-role="commentViewerUl">
+							<li class="text-center">
+								<h5 class="text-primary">
+									<i class="fa fa-refresh fa-spin fa-3x fa-fw"></i>
+									<span class="sr-only">Loading...</span>
+									데이터 로딩중 입니다..
+								</h5>
+							</li>
+							<li style="display: none;"></li>
+						</ul>
+					</div>
+					<div class="modal-footer modal-color-dark-grey">
+						<button type="button" class="btn btn-primary" data-role="quesSaveBtn">저장</button>
+						<button type="button" class="btn btn-clear-white" data-dismiss="modal">닫기</button>
+					</div>
+				</div>
+			</div>
+		</div><!-- #queModal -->
+		<!-- #objModal -->
+		<div id="objModal" class="modal fade" role="dialog" aria-labelledby="objModal">
+			<div class="modal-dialog modal-xs">
+				<div class="modal-content">
+					<div class="modal-header modal-color-dark-grey">
+						<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+						<h4 class="modal-title">성적이의신청</h4>
+					</div>
+					<div class="modal-body">
+						<ul class="list-unstyled" data-role="commentViewerUl">
+							<li class="text-center">
+								<h5 class="text-primary">
+									<i class="fa fa-refresh fa-spin fa-3x fa-fw"></i>
+									<span class="sr-only">Loading...</span>
+									데이터 로딩중 입니다..
+								</h5>
+							</li>
+							<li style="display: none;"></li>
+						</ul>
+					</div>
+					<div class="modal-footer modal-color-dark-grey">
+					<div style="display:none;"><button type="button" class="btn btn-primary" style="display:none" data-role="objDeleteBtn">삭제</button></div>
+						<button type="button" class="btn btn-primary" data-role="objSaveBtn">수정</button>
+						<button type="button" class="btn btn-clear-white" data-dismiss="modal">닫기</button>
+					</div>
+				</div>
+			</div>
+		</div><!-- #objModal -->
+	
+
+	</div>
+
+	<div class="footer" data-role="footer">
+		<div class="row">
+			<div class="col-xs-12">
+				<address>성남시 중원구 광명로 377(금광2동 2685)<span class="hidden-xs">&nbsp;&nbsp;&nbsp;</span><br class="visible-xs" />TEL:010-0000-0000</address>
+				<p>Copyright &copy; SHINGU COLLEGE.<br class="visible-xs" />ALL RIGHTS RESRERVED.</p>
+			</div>
+		</div>
+	</div>
+	
+	<div id="pushModal" class="modal fade" role="dialog" aria-labelledby="pushModal">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title"><i class="fa fa-bell"></i> PUSH 알림</h4>
+				</div>
+				<div class="modal-body">
+					<ul class="bell-list">
+						<li class="text-center push-list-none">수신된 PUSH 메시지가 없습니다.</li>
+						</ul>
+				</div>
+				<div class="modal-footer">
+					<button class="btn btn-lg btn-text pull-right" type="button" data-role="receiveList" title="PUSH">PUSH 수신함 바로가기 <i class="fa fa-angle-right"></i></button>
+				</div>
+			</div>
+		</div>
+	</div>
+ 
+ 	<div id="memoModal" class="modal fade" role="dialog" aria-labelledby="memoModal">
+		<div class="modal-dialog modal-md">
+			<div class="modal-content">
+				<div class="modal-header modal-color-dark-grey">
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					<h4 class="modal-title">NOTE 편집</h4>
+				</div>
+				<div class="modal-body">
+					<ul class="list-unstyled" data-role="commentViewerUl">
+						<li class="text-center">
+							<h5 class="text-primary">
+								<i class="fa fa-refresh fa-spin fa-3x fa-fw"></i>
+								<span class="sr-only">Loading...</span>
+								데이터 로딩중 입니다..
+							</h5>
+						</li>
+						<li style="display: none;"></li>
+					</ul>
+				</div>
+				<div class="modal-footer modal-color-dark-grey">
+					<button type="button" class="btn btn-clear-red" data-role="saveMemo">저장</button>
+					<button type="button" class="btn btn-clear-white" data-dismiss="modal">닫기</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="help-box">
+		<div class="help-inner">
+			<!-- <button type="button" class="btn btn-help" data-role=""><i class="fa fa-question-circle" aria-hidden="true"></i></button> -->
+			<button type="button" class="btn btn-help btn-breadcrumb" data-role=""><i class="fa fa-question-circle" aria-hidden="true"></i></button>
+			<div class="help-content">
+				<div class="help-header">
+					<h4>도움말</h4>
+				</div>
+				<div class="help-body">
+				    <h5><span style="font-size: 10pt;">■ 본 도움말은 <strong>성적조회</strong><strong>(</strong><strong>수강자료</strong><strong>)</strong> 메뉴에 대한 내용입니다.</span></h5><ol><li><h5><span style="font-size: 10pt;">수강한 교과목에 대한 정보를 조회가 가능합니다. 그리고 연락처 확인 후 강의에 대한 점수 확인 및 평가를 진행하세요.</span></h5></li><li><h5><span style="font-size: 10pt;">연락처 확인 및 강의 평가는 연락처 확인 버튼을 클릭하여 진행이 가능합니다.</span></h5></li></ol></div>
+				<div class="help-footer text-center">
+					</div>
+			</div>
+		</div>
+	</div>
+	
+	<div id="mobileModal" class="modal fade" role="dialog" aria-labelledby="memoModal">
+		<div class="modal-dialog modal-md">
+			<div class="text-right">
+				<button type="button" class="btn btn-modal-close" data-dismiss="modal"><i class="fa fa-times"></i></button>
+			</div>
+			<div class="modal-content">
+				<div class="modal-body">
+					<ul class="list-unstyled" data-role="commentViewerUl">
+						<li>
+							<div style="position:relative; height:420px; position: relative;overflow-x: scroll;overflow-y: scroll;width:100%;-webkit-overflow-scrolling: touch;">
+								<iframe name="mobileFrame" frameborder="0" style="height:100%;width:100%;"></iframe>
+							</div>
+						</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

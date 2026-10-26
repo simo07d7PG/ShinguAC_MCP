@@ -1,0 +1,119 @@
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Cache-control" content="no-cache">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="신구대학교 학생종합포털">
+<meta name="author" content="SHINGU">
+<link rel="icon" href="/resources/custom/images/main/shingu-symbol.ico"><head>
+    
+</head>
+<body>
+<!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+    <script src="/resources/html5shiv/3.7.3/js/html5shiv.min.js"></script>
+    <script src="/resources/html5shiv/3.7.3/js/html5shiv-printshiv.min.js"></script>
+    <script src="/resources/respond/1.4.2/js/respond.min.js"></script>
+    <![endif]-->
+    <!--canvas ie 7, 8-->
+    <!--[if IE]>
+    <script src="/resources/rMateChartH5/4.0/js/excanvas.js"></script>
+    <![endif]-->
+    
+    <script src="/resources/jquery/1.12.4/js/jquery-1.12.4.min.js"></script>
+    <script src="/resources/jquery-ui/1.11.4/js/jquery-ui.min.js"></script>
+    <script src="/resources/jquery-ui/1.11.4/js/jquery.ui.touch-punch.min.js"></script>
+    <script src="/resources/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    
+    <script src="/resources/bootstrap-tagsinput/0.6.1/js/bootstrap-tagsinput.js"></script>
+	<script src="/resources/bootstrap3-typeahead/3.1.0/js/bootstrap3-typeahead.min.js"></script>
+
+    <script type="text/javascript" src="/resources/custom/js/moment-with-locales.min.js"></script>
+    <script type="text/javascript" src="/resources/custom/js/moment-kr.js"></script>
+    <script type="text/javascript" src="/resources/custom/js/bootstrap-datetimepicker.min.js"></script>
+
+    <script src="/resources/custom/js/jquery.form.min.js"></script>
+    <script src="/resources/custom/js/jquery.validate.js"></script>
+    <script src="/resources/custom/js/jquery.validate.addMethods.js"></script>
+    <script src="/resources/custom/js/jquery.validate.messages_ko.min.js"></script>
+    <script src="/resources/custom/js/jquery-validate.bootstrap-tooltip.js"></script>
+    <script src="/resources/custom/js/bootstrap-select.js"></script>
+    <script src="/resources/custom/js/bootstrap-select.defaults-ko_KR.min.js"></script>
+    <script src="/resources/custom/js/jquery.fileDownload.js"></script>
+    <script src="/resources/custom/js/jquery.newsTicker.js"></script>
+
+    <script src="/resources/toastr/2.1.3/js/toastr.min.js"></script>
+    <script src="/resources/confirm/1.8.0/js/jquery-confirm.min.js"></script>
+
+    <script src="/resources/fullcalendar/3.0.1/js/fullcalendar.min.js"></script>
+    <script src="/resources/fullcalendar/3.0.1/js/locale/ko.js"></script>
+    
+    <script src="/resources/jquery-file-upload/js/vendor/jquery.ui.widget.js"></script>
+    <script src="/resources/jquery-file-upload/js/jquery.iframe-transport.js"></script>
+    <script src="/resources/jquery-file-upload/js/jquery.fileupload.js"></script>
+    <script src="/resources/jquery-file-upload/js/jquery.fileupload-process.js"></script>
+    <script src="/resources/jquery-file-upload/js/jquery.fileupload-validate.js"></script>
+    
+    <script src="/resources/spin/2.3.2/js/spin.min.js"></script>
+    <script src="/resources/spin/2.3.2/js/jquery.spin.js"></script>
+    
+    <script src="/resources/jstree/3.3.1/js/jstree.min.js"></script>
+    <script src="/resources/printArea/2.4.1/js/jquery.printarea.js"></script>
+    
+    <script src="/resources/custom/js/ie10-viewport-bug-workaround.js"></script>
+    
+    <script src="/resources/custom/js/poizn.common.js"></script>
+    <script src="/resources/custom/js/poizn.menu.js"></script>
+    <script src="/resources/custom/js/poizn.form.js"></script>
+    <script src="/resources/custom/js/poizn.file.js"></script>
+    <script src="/resources/custom/js/poizn.select.ajax.js"></script>
+    <script src="/resources/custom/js/poizn.input.ajax.js"></script>
+    <script src="/resources/custom/js/poizn.checkbox.js"></script>
+    <script src="/resources/custom/js/poizn.org.chart.js"></script>
+    <script src="/resources/custom/js/poizn.mail.js"></script>
+    <script src="/resources/custom/js/poizn.mail.preview.js"></script>
+    <script src="/resources/custom/js/poizn.cmm.code.js"></script>
+    <script src="/resources/netfunnel/netfunnel.js"></script><meta name="decorator" content="/WEB-INF/view/cmm/template/blank/template.jsp" />
+<!-- <form name="ssoRedFrm" id="ssoRedFrm" method="post" action="http://testsso.shingu.ac.kr:8070/index">  -->
+<form name="ssoRedFrm" id="ssoRedFrm" method="post" action="https://login.shingu.ac.kr/index"> 
+ 	<input type="hidden" name="loginType" 	id="loginType" value=""/>
+ 	<input type="hidden" name="param1" 		id="param1" value=""/>
+ 	<input type="hidden" name="param2" 		id="param2" value=""/>
+ 	<input type="hidden" name="param3" 		id="param3" value=""/>
+</form>
+<script type="text/javascript">
+	$(document).ready(function() {
+		var duplicateLogin = "";
+		var returnType = "";
+		var autoLoginYN = "null";
+		
+		if(returnType == 'A'){
+			$("#param1").val("acceptUrl");
+			//var param2 = encodeURIComponent('http://testportal.shingu.ac.kr:8080/ADM/AOY/AOY007P?yy='+''+'&haggi='+''+'&gwajeongCd='+'');
+			var param2 = encodeURIComponent('https://student.shingu.ac.kr/ADM/AOY/AOY007P?yy='+''+'&haggi='+''+'&gwajeongCd='+'');
+			$("#param2").val(param2);
+			$("#ssoRedFrm").submit();
+		}else if(returnType == 'B'){
+//			var param2 = encodeURIComponent('http://testportal.shingu.ac.kr:8080/ADM/AGJ/AGJ002P?yeonsuNo='+'');
+			var param2 = encodeURIComponent('https://student.shingu.ac.kr/ADM/AGJ/AGJ002P?yeonsuNo='+'');
+			$("#param1").val("acceptUrl");
+			$("#param2").val(param2);
+			$("#ssoRedFrm").submit();
+		}else{
+			if(duplicateLogin == 'Y'){
+				alert("중복로그인으로 현재 세션이 종료되었습니다.");
+				$("#ssoRedFrm").submit();
+			}else{
+				// alert("세션이 종료되었습니다.");
+				if(autoLoginYN=='N'){
+					window.location.href = "https://login.shingu.ac.kr/logout";
+				} else {
+					$("#ssoRedFrm").submit();					
+				}
+			}
+		}
+		
+	});
+</script> 
+</body>

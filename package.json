@@ -14,8 +14,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "recon": "tsx --env-file=.env scripts/recon.ts",
-    "mask": "tsx scripts/mask.ts",
-    "check:pii": "tsx scripts/check-pii.ts",
+    "mask": "node scripts/mask-fixture.mjs",
+    "check:pii": "node scripts/mask-fixture.mjs --check",
     "smoke": "tsx --env-file=.env scripts/smoke.ts"
   },
   "dependencies": {

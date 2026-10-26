@@ -1,0 +1,2978 @@
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="format-detection" content="telephone=no" />
+<meta property="og:url" content="https://www.shingu.ac.kr/index.do" />
+<meta property="og:title" content="신구대학교" />
+<meta property="og:description" content="커뮤니티 > 신구소식 > 공지사항" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="신구대학교"/>
+<meta property="og:image" content="https://www.shingu.ac.kr/img/snsSguLog.jpg" />
+<title>신구대학교 커뮤니티 > 신구소식 > 공지사항</title>
+
+<link rel="stylesheet" type="text/css" href="/sgu/css/common.css" /><!-- reset -->
+<link rel="stylesheet" type="text/css" href="/sgu/css/board.css" /><!-- board -->
+<link rel="stylesheet" type="text/css" href="/sgu/type/KOR_A/css/layout.css" /><!-- 개별 -->
+<link rel="stylesheet" type="text/css" href="/sgu/css/kor.css" /><!-- 컨텐츠 -->
+<link rel="stylesheet" href="/css/pop_zone.css" />
+<link rel="stylesheet" href="/css/jquery-ui.css" />
+<link rel="stylesheet" href="/css/jquery-ui.theme.css" />
+
+<!--[if lt IE 9]>
+<script src="../../common/js/html5shiv.js"></script>
+<![endif]-->
+
+
+<script type="text/javascript" src="/sgu/js/jquery-2.2.1.min.js"></script>
+<script type="text/javascript" src="/sgu/js/jquery.font-accessibility.dev.js"></script>
+
+<!-- slick -->
+<link rel="stylesheet" type="text/css" href="/sgu/js/slick/slick.css" />
+<script type="text/javascript" src="/sgu/js/slick/slick.min.js"></script>
+<script type="text/javascript" src="/sgu/js/slick/slick.acc.js"></script>
+<!-- mCustomScrollbar -->
+<link rel="stylesheet" type="text/css" href="/sgu/js/mCustomScrollbar/jquery.mCustomScrollbar.css" />
+<script type="text/javascript" src="/sgu/js/mCustomScrollbar/jquery.mCustomScrollbar.concat.min.js"></script>
+
+<script type="text/javascript" src="/sgu/js/common.js"></script><!-- 공통 스크립트 -->
+<script type="text/javascript" src="/sgu/js/board.js"></script><!-- board -->
+<script type="text/javascript" src="/sgu/type/KOR_A/js/design.js"></script><!-- 개별 -->
+
+<script src="/js/jquery.form.js"></script>
+<script src="/js/jquery-ui.min.js"></script>
+<script src="/js/comm_fr.js"></script>
+<script src="/js/util.js"></script>
+<script src="/js/jquery.tmpl.js"></script>
+
+
+
+</head>
+<body>
+    
+<div id="skip_menu">
+	<a href="#contents" title="바로가기">컨텐츠 바로가기</a>
+	<a href="#gnb" title="바로가기">메뉴 바로가기</a>
+	<a href="#footer" title="바로가기">푸터 바로가기</a>
+</div>
+
+	<!-- container -->
+	<div id="container">
+		<div id="dim"></div>
+		
+
+<script>
+var gnbDep1 = 0;
+var gnbDep2 = 0;
+var gnbDep3 = 0;
+var gnbDep4 = 0;
+
+function setHref(obj, org){
+
+		if($(obj).find("> div").length > 0){
+			if($(obj).find("> div> ul > li").length > 0){
+				if($(obj).find(">a").data("sub")=="Y"){
+					$(org).find(">a").attr("href",$(obj).find("> div> ul > li:eq(0) > a").attr("href"));
+					$(org).find(">a").attr("target",$(obj).find("> div> ul > li:eq(0) > a").attr("target"));
+				}else{
+					$(org).find(">a").attr("href",$(org).find(">a").attr("href"));
+				}
+				setHref($(obj).find("> div> ul > li:eq(0)"),org);
+			}
+		}else{
+			if($(obj).find("> ul > li").length > 0){
+				if($(obj).find(">a").data("sub")=="Y"){
+					$(org).find(">a").attr("href",$(obj).find("> ul > li:eq(0) > a").attr("href"));
+					$(org).find(">a").attr("target",$(obj).find("> ul > li:eq(0) > a").attr("target"));
+				}else{
+					$(org).find(">a").attr("href",$(org).find(">a").attr("href"));
+				}
+				setHref($(obj).find("> ul > li:eq(0)"),org);
+			}
+		}
+}
+
+function setSnbHref(obj, org){
+	var v_menuno = ($(obj).data("menuno"));
+	var v_sub = ($(obj).data("sub"));
+	
+	if($("ul#gnb li."+v_menuno+" > div").length > 0){
+		if($("ul#gnb li."+v_menuno+" > div > ul > li").length > 0){
+			if(v_sub=="Y"){
+				$(org).find(">a").attr("href",$("ul#gnb li."+v_menuno+" > div > ul > li:eq(0) > a").attr("href"));
+				$(org).find(">a").attr("target",$("ul#gnb li."+v_menuno+" > div > ul > li:eq(0) > a").attr("target"));
+			}else{
+				$(org).find(">a").attr("href",$(org).find(">a").attr("href"));
+			}
+			setHref($("ul#gnb li."+v_menuno+" > div > ul > li:eq(0)"),org);
+		}
+	}else{
+		if($("ul#gnb li."+v_menuno+" > ul > li").length > 0){
+			if(v_sub=="Y"){
+				$(org).find(">a").attr("href",$("ul#gnb li."+v_menuno+" > ul > li:eq(0) > a").attr("href"));
+				$(org).find(">a").attr("target",$("ul#gnb li."+v_menuno+" > ul > li:eq(0) > a").attr("target"));
+			}else{
+				$(org).find(">a").attr("href",$(org).find(">a").attr("href"));
+			}
+			setHref($("ul#gnb li."+v_menuno+" > ul > li:eq(0)"),org);
+		}
+	}
+}
+
+function login()
+{
+	$("#loginForm").attr("action","https://login.shingu.ac.kr");
+	$("#loginForm").submit();
+}
+
+$(function(){
+	$(document).on("click", "ul#gnb li, ul#rnb li:not(ul#rnb>li.child), .mSnb_menu li", function(){
+		setHref($(this),$(this));
+	});
+	
+	$(document).on("click", "nav#snb li", function(){
+		setSnbHref($(this),$(this));
+	});
+	
+	$(document).on("click", ".btn_topSearch", function(){
+		ifrSiteMapPop('SearchPop','/cms/FR_CON/SearchPop.do');
+	});
+	$(document).on("click", ".btn_topSitemap", function(){
+		ifrSiteMapPop('SitePop','/cms/FR_CON/SiteMapPop.do?SGN=2&SN=2');
+	});
+});
+
+</script>
+<div id="header">
+	<header>
+		<h1>
+			<a href="https://www.shingu.ac.kr" title="신구대학교 로고">
+				<img src="/ajaxfile/CMN_SVC/FileView.do?GBN=X01&SITE_GROUP_NO=2&SITE_NO=2" alt="신구대학교" />
+			</a>
+		</h1>
+		<div id="gnb_dim"></div>
+		<nav>
+			<p>
+				<span>
+					
+						
+						
+							<a href="#;" onclick="login()" title="로그인">로그인</a>
+						
+					
+					<a href="https://login.shingu.ac.kr" target="_blank" title="새창열림" >종합정보시스템</a>
+					<a href="#;" class="btn_topSitemap" title="사이트맵  팝업">사이트맵</a>
+				</span>
+				<a href="https://english.shingu.ac.kr/index.do" target="_blank" id="btn_lan2" title="새창열림">ENG</a>
+				<button id="btn_close">메뉴닫기</button>
+			</p>
+			<ul id="gnb">
+	            
+		           	<li class="child 10" >
+						<a  href="/cms/FR_CON/index.do?MENU_ID=10        " title="" data-sub="Y" target="_self" >
+						
+						
+						
+							대학소개
+							
+						
+						
+						</a>
+		           		
+			           		<div>
+			           		<p><b>대학소개</b></p>
+							
+			           		<ul class="menuM">
+			           		
+			           		<li class="child  20">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=20        " title="" data-sub="Y" target="_self" >신구비전2030</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=30        " title="" data-sub="Y"  target="_self" >신구비전2030</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=40        " title="" data-sub="Y"  target="_self" >건학이념</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=50        " title="" data-sub="Y"  target="_self" >비전 달성 로드맵</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=60        " title="" data-sub="Y"  target="_self" >전략체계도</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="  70">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=70        " title="" data-sub="Y" target="_self" >교육이념 및 목표</a>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  80">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=80        " title="" data-sub="Y" target="_self" >인사말</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=90        " title="" data-sub="Y"  target="_self" >이사장인사말</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=100       " title="" data-sub="Y"  target="_self" >총장인사말</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="  110">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=110       " title="" data-sub="Y" target="_self" >연혁</a>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  150">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=150       " title="" data-sub="Y" target="_self" >정보공개</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=210       " title="" data-sub="Y"  target="_self" >정보공개제도 안내</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2030      " title="" data-sub="Y"  target="_self" >예·결산공고</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2020      " title="" data-sub="Y"  target="_self" >예·결산 및 법정위원회<br>공지사항</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2170      " title="" data-sub="Y"  target="_self" >기부금 공개</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2100      " title="" data-sub="Y"  target="_self" >업무추진비</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.academyinfo.go.kr/pubinfo/pubinfo0020/list.do?schlId=0000501" title="새창열림" data-sub="Y"  target="_blank" >신구대학교 대학정보공시</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.open.go.kr/" title="새창열림" data-sub="Y"  target="_blank" >정보공개청구</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2300      " title="" data-sub="Y"  target="_self" >신구학원 임원현황 등</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2310      " title="" data-sub="Y"  target="_self" >대학 안전관리 계획</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  120">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=120       " title="" data-sub="Y" target="_self" >학교안내</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=130       " title="" data-sub="Y"  target="_self" >학교현황</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=140       " title="" data-sub="Y"  target="_self" >조직도</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=160       " title="" data-sub="Y"  target="_self" >규정집</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2430      " title="" data-sub="Y"  target="_self" >규정 제·개정 의견수렴</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=170       " title="" data-sub="Y"  target="_self" >윤리강령</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=180       " title="" data-sub="Y"  target="_self" >대학요람</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=190       " title="" data-sub="Y"  target="_self" >심볼&로고</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=200       " title="" data-sub="Y"  target="_self" >신구CI집</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://vrcampus.shingu.ac.kr/ " title="새창열림" data-sub="Y"  target="_blank" >VR캠퍼스</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="  230">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=230       " title="" data-sub="Y" target="_self" >산학협력</a>
+			           			
+			           		</li>
+			           		
+			           		<li class="  240">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=240       " title="" data-sub="Y" target="_self" >국제교류원</a>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  250">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=250       " title="" data-sub="Y" target="_self" >찾아오시는 길</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=260       " title="" data-sub="Y"  target="_self" >약도/교통안내</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=270       " title="" data-sub="Y"  target="_self" >캠퍼스맵 </a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="  280">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=280       " title="" data-sub="Y" target="_self" >전화번호 안내</a>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  290">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=290       " title="" data-sub="Y" target="_self" >개인정보보호</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=300       " title="" data-sub="Y"  target="_self" >개인정보처리방침</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=310       " title="새창열림" data-sub="Y"  target="_blank" >영상정보처리기기<br>운영관리 방침</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+							</ul>
+							
+							</div>
+							
+		           	</li>
+           	 	
+		           	<li class="child 320" >
+						<a  href="/cms/FR_CON/index.do?MENU_ID=320       " title="" data-sub="Y" target="_self" >
+						
+						
+						
+							대학기관
+							
+						
+						
+						</a>
+		           		
+			           		<div>
+			           		<p><b>대학기관</b></p>
+							
+			           		<ul class="menuM">
+			           		
+			           		<li class="child  330">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=330       " title="" data-sub="Y" target="_self" >대학본부</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=340       " title="" data-sub="Y"  target="_self" >기획처</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=350       " title="" data-sub="Y"  target="_self" >교무처</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=360       " title="" data-sub="Y"  target="_self" >학생처</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=370       " title="" data-sub="Y"  target="_self" >산학협력처</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=380       " title="" data-sub="Y"  target="_self" >입학처</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=390       " title="" data-sub="Y"  target="_self" >사무행정처</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  400">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=400       " title="" data-sub="Y" target="_self" >부속·부설기관</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=450       " title="" data-sub="Y"  target="_self" >교수학습개발원</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=570       " title="" data-sub="Y"  target="_self" >교육품질관리센터</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=560       " title="" data-sub="Y"  target="_self" >현장실습지원센터</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=430       " title="" data-sub="Y"  target="_self" >평생교육원</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=490       " title="" data-sub="Y"  target="_self" >장애학생지원센터</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2090      " title="" data-sub="Y"  target="_self" >식물원</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=460       " title="" data-sub="Y"  target="_self" >IT지원센터</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=550       " title="" data-sub="Y"  target="_self" >창의융합혁신센터</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=470       " title="" data-sub="Y"  target="_self" >국제교류원</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=410       " title="" data-sub="Y"  target="_self" >도서관</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=420       " title="" data-sub="Y"  target="_self" >우촌박물관</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=510       " title="" data-sub="Y"  target="_self" >신문방송국</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=530       " title="" data-sub="Y"  target="_self" >부속치과의원</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=520       " title="" data-sub="Y"  target="_self" >예비군대대</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=540       " title="" data-sub="Y"  target="_self" >부속유치원</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  580">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=580       " title="" data-sub="Y" target="_self" >산학협력단</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=590       " title="" data-sub="Y"  target="_self" >산학협력팀</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=600       " title="" data-sub="Y"  target="_self" >취업지원팀</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=620       " title="" data-sub="Y"  target="_self" >신구대학교식물원</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=630       " title="" data-sub="Y"  target="_self" >서비스러닝센터</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2240      " title="" data-sub="Y"  target="_self" >성남시 어린이·사회복지 급식관리지원센터</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  640">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=640       " title="" data-sub="Y" target="_self" >창업지원단</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="https://sgbi.shingu.ac.kr/" title="새창열림" data-sub="Y"  target="_blank" >창업보육센터</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://sgbe.shingu.ac.kr/" title="새창열림" data-sub="Y"  target="_blank" >창업교육센터</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+							</ul>
+							
+							</div>
+							
+		           	</li>
+           	 	
+		           	<li class="child 670" >
+						<a  href="/cms/FR_CON/index.do?MENU_ID=670       " title="" data-sub="N" target="_self" >
+						
+						
+						
+							학과소개
+							
+						
+						
+						</a>
+		           		
+			           		<div>
+			           		<p><b>학과소개</b></p>
+							
+			           		<ul class="menuM">
+			           		
+			           		<li class="child  690">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=690       " title="" data-sub="N" target="_self" >산업디자인학부</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/media.html" title="새창열림" data-sub="N"  target="_blank" >영상디자인과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/visual.html" title="새창열림" data-sub="N"  target="_blank" >시각디자인과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/fashion.html" title="새창열림" data-sub="N"  target="_blank" >패션디자인과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/beauty.html" title="새창열림" data-sub="N"  target="_blank" >뷰티디자인과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/hairdesign.html" title="새창열림" data-sub="N"  target="_blank" >헤어디자인전공</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/skincare.html" title="새창열림" data-sub="N"  target="_blank" >스킨케어전공</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/makeup.html" title="새창열림" data-sub="N"  target="_blank" >메이크업전공</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/esports.html" title="새창열림" data-sub="N"  target="_blank" >e스포츠과</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  750">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=750       " title="" data-sub="N" target="_self" >생명환경학부</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/ela.html" title="새창열림" data-sub="N"  target="_blank" >환경조경학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/plant.html" title="새창열림" data-sub="N"  target="_blank" >생태정원전공</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/florist.html" title="새창열림" data-sub="N"  target="_blank" >플로리스트전공</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/garden.html" title="새창열림" data-sub="N"  target="_blank" >정원문화산업전공</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/animal.html" title="새창열림" data-sub="N"  target="_blank" >반려동물산업과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/veterinarynursing.html" title="새창열림" data-sub="N"  target="_blank" >반려동물보건과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/bio.html" title="새창열림" data-sub="N"  target="_blank" >바이오생명과학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/child.html" title="새창열림" data-sub="N"  target="_blank" >유아교육학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/fn.html" title="새창열림" data-sub="N"  target="_blank" >식품영양학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/hca.html" title="새창열림" data-sub="N"  target="_blank" >호텔조리과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/fsm.html" title="새창열림" data-sub="N"  target="_blank" >호텔제과제빵과</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  840">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=840       " title="" data-sub="N" target="_self" >정보미디어학부</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/photo.html" title="새창열림" data-sub="N"  target="_blank" >사진영상콘텐츠과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/arts.html" title="새창열림" data-sub="N"  target="_blank" >프린트미디어과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/contents.html" title="새창열림" data-sub="N"  target="_blank" >미디어콘텐츠과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/software.html" title="새창열림" data-sub="N"  target="_blank" >컴퓨터소프트웨어과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/ai.html" title="새창열림" data-sub="N"  target="_blank" >AI데이터과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/vr.html" title="새창열림" data-sub="N"  target="_blank" >게임콘텐츠과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://security.shingu.ac.kr/index.do" title="새창열림" data-sub="N"  target="_blank" >IT보안과</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  910">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=910       " title="" data-sub="N" target="_self" >비즈니스실무학부</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/marketing.html" title="새창열림" data-sub="N"  target="_blank" >마케팅학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/tax.html" title="새창열림" data-sub="N"  target="_blank" >세무회계학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/hotel.html" title="새창열림" data-sub="N"  target="_blank" >호텔관광과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/airline.html" title="새창열림" data-sub="N"  target="_blank" >항공서비스과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/welfare.html" title="새창열림" data-sub="N"  target="_blank" >사회복지학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/kidCare.html" title="새창열림" data-sub="N"  target="_blank" >아동보육과</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  980">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=980       " title="" data-sub="N" target="_self" >보건의료학부</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/sgpt.html" title="새창열림" data-sub="N"  target="_blank" >물리치료학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/radiotech.html" title="새창열림" data-sub="N"  target="_blank" >방사선학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/dentech.html" title="새창열림" data-sub="N"  target="_blank" >치기공학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/denthygiene.html" title="새창열림" data-sub="N"  target="_blank" >치위생학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://enter.shingu.ac.kr/intro/occupational.html" title="새창열림" data-sub="N"  target="_blank" >작업치료학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/bmls.html" title="새창열림" data-sub="N"  target="_blank" >임상병리학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/health.html" title="새창열림" data-sub="N"  target="_blank" >보건의료행정학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/sports.html" title="새창열림" data-sub="N"  target="_blank" >스포츠재활과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/emergency.html" title="새창열림" data-sub="N"  target="_blank" >응급구조학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/nursing.html" title="새창열림" data-sub="N"  target="_blank" >간호학과(신설)</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  1070">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1070      " title="" data-sub="N" target="_self" >공간시스템학부</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/geoinfo.html" title="새창열림" data-sub="N"  target="_blank" >부동산지적학과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/interior.html" title="새창열림" data-sub="N"  target="_blank" >실내건축과</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://www.shingu.ac.kr/intro/archi.html" title="새창열림" data-sub="N"  target="_blank" >건축학과</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="  2350">
+			           			<a href="https://www.shingu.ac.kr/intro/liberalstudies.html" title="새창열림" data-sub="N" target="_blank" >자율전공학과</a>
+			           			
+			           		</li>
+			           		
+							</ul>
+							
+							</div>
+							
+		           	</li>
+           	 	
+		           	<li class="child 1130" >
+						<a  href="/cms/FR_CON/index.do?MENU_ID=1130      " title="" data-sub="Y" target="_self" >
+						
+						
+						
+							대학생활
+							
+						
+						
+						</a>
+		           		
+			           		<div>
+			           		<p><b>대학생활</b></p>
+							
+			           		<ul class="menuM">
+			           		
+			           		<li class="child  1140">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1140      " title="" data-sub="Y" target="_self" >학사정보</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1150      " title="" data-sub="Y"  target="_self" >전체학사일정</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1160      " title="" data-sub="Y"  target="_self" >교원자격증</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  1170">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1170      " title="" data-sub="Y" target="_self" >학생서비스</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="https://service.shingu.ac.kr/cms/FR_CON/index.do?MENU_ID=210" title="새창열림" data-sub="Y"  target="_blank" >증명발급</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://service.shingu.ac.kr/cms/FR_CON/index.do?MENU_ID=110" title="새창열림" data-sub="Y"  target="_blank" >학적기재사항 정정원접수</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  1180">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1180      " title="" data-sub="Y" target="_self" >대학생활 가이드</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1190      " title="" data-sub="Y"  target="_self" >장학안내</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1200      " title="" data-sub="Y"  target="_self" >교내시설이용안내</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1210      " title="" data-sub="Y"  target="_self" >병무 및 예비군안내</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1220      " title="" data-sub="Y"  target="_self" >학생자치기구</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="  2390">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=2390      " title="" data-sub="Y" target="_self" >대학생활안내</a>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  1230">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1230      " title="" data-sub="Y" target="_self" >취업정보</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2410      " title="" data-sub="Y"  target="_self" >채용정보</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1280      " title="" data-sub="Y"  target="_self" >관련사이트</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="  1290">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1290      " title="" data-sub="Y" target="_self" >창업지원</a>
+			           			
+			           		</li>
+			           		
+			           		<li class="  1300">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1300      " title="" data-sub="Y" target="_self" >사회봉사</a>
+			           			
+			           		</li>
+			           		
+			           		<li class="  2000">
+			           			<a href="https://dorm.shingu.ac.kr" title="새창열림" data-sub="Y" target="_blank" >기숙사</a>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  1310">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1310      " title="" data-sub="Y" target="_self" >신구행사</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1320      " title="" data-sub="Y"  target="_self" >백마체전</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1330      " title="" data-sub="Y"  target="_self" >백마대동제</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1340      " title="" data-sub="Y"  target="_self" >신구EXPO</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="  1350">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1350      " title="" data-sub="Y" target="_self" >학생생활상담</a>
+			           			
+			           		</li>
+			           		
+			           		<li class="  1360">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1360      " title="" data-sub="Y" target="_self" >글로벌프로그램</a>
+			           			
+			           		</li>
+			           		
+			           		<li class="  1370">
+			           			<a href="https://library.shingu.ac.kr/Erm/WebDBList?gubun=%EB%8F%99%EC%98%81%EC%83%81%EA%B0%95%EC%9D%98&gubunsub=%EC%A0%84%EC%B2%B4" title="새창열림" data-sub="Y" target="_blank" >교내어학강좌안내</a>
+			           			
+			           		</li>
+			           		
+			           		<li class="  2220">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=2220      " title="" data-sub="Y" target="_self" >무선인터넷서비스</a>
+			           			
+			           		</li>
+			           		
+							</ul>
+							
+							</div>
+							
+		           	</li>
+           	 	
+		           	<li class="childon 1380" >
+						<a  href="/cms/FR_CON/index.do?MENU_ID=1380      " title="" data-sub="Y" target="_self" class="on">
+						
+						
+						
+							커뮤니티
+							
+						
+						
+						</a>
+		           		
+			           		<div>
+			           		<p><b>커뮤니티</b></p>
+							
+			           		<ul class="menuM">
+			           		
+			           		<li class="child on 1390">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1390      " title="" data-sub="Y" target="_self" >신구소식</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="on">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1400      " title="" data-sub="Y"  target="_self" class="on 1400">공지사항</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1410      " title="" data-sub="Y"  target="_self" >장학, 대출공지</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2250      " title="" data-sub="Y"  target="_self" >장애학생지원 공지</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2370      " title="" data-sub="Y"  target="_self" >건강 게시판</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2380      " title="" data-sub="Y"  target="_self" >심폐소생술</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1420      " title="" data-sub="Y"  target="_self" >입찰정보</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1430      " title="" data-sub="Y"  target="_self" >채용소식</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2460      " title="" data-sub="Y"  target="_self" >공모전소식</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  1440">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1440      " title="" data-sub="Y" target="_self" >캠퍼스톡톡</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1450      " title="" data-sub="Y"  target="_self" >자유게시판</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2150      " title="" data-sub="Y"  target="_self" >감염예방</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  1460">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1460      " title="" data-sub="Y" target="_self" >동아리 톡톡</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1470      " title="" data-sub="Y"  target="_self" >동아리 소개</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1480      " title="" data-sub="Y"  target="_self" >리더스</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2050      " title="" data-sub="Y"  target="_self" >S·B·C(농구부)</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2510      " title="" data-sub="Y"  target="_self" >NEWHILL(배구부)</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1500      " title="" data-sub="Y"  target="_self" >콕콕콕(배드민턴부)</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2500      " title="" data-sub="Y"  target="_self" >SFC(축구부)</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1540      " title="" data-sub="Y"  target="_self" >S·G·T·C(테니스부)</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2060      " title="" data-sub="Y"  target="_self" >그림패움</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1510      " title="" data-sub="Y"  target="_self" >노들(노래가좋은사람들)</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1490      " title="" data-sub="Y"  target="_self" >S.C.F.(기독교동아리)</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1550      " title="" data-sub="Y"  target="_self" >Nature Plus</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1560      " title="" data-sub="Y"  target="_self" >데시나</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1520      " title="" data-sub="Y"  target="_self" >머무네</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=2040      " title="" data-sub="Y"  target="_self" >불똥별(불교동아리)</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1570      " title="" data-sub="Y"  target="_self" >볼링블링(볼링부)</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1580      " title="" data-sub="Y"  target="_self" >솔트레인</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  1590">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1590      " title="" data-sub="Y" target="_self" >묻고 답하기</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1600      " title="" data-sub="Y"  target="_self" >신구대학교 FAQ</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1610      " title="" data-sub="Y"  target="_self" >신구대학교 Q&A</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="child  1620">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1620      " title="" data-sub="Y" target="_self" >생활서비스</a>
+			           			
+			           			<ul class="menuS">
+			           			
+			           			<li class="">
+			           				<a href="/cms/FR_CON/index.do?MENU_ID=1630      " title="" data-sub="Y"  target="_self" >금주의 식단</a>
+			           				
+			           			</li>
+			           			
+			           			<li class="">
+			           				<a href="https://service.shingu.ac.kr/" title="새창열림" data-sub="Y"  target="_blank" >분실물/습득물</a>
+			           				
+			           			</li>
+			           			
+			           			</ul>
+			           			
+			           		</li>
+			           		
+			           		<li class="  1650">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1650      " title="" data-sub="Y" target="_self" >포토갤러리</a>
+			           			
+			           		</li>
+			           		
+			           		<li class="  1660">
+			           			<a href="/cms/FR_CON/index.do?MENU_ID=1660      " title="" data-sub="Y" target="_self" >동영상갤러리</a>
+			           			
+			           		</li>
+			           		
+							</ul>
+							
+							</div>
+							
+		           	</li>
+           	 	
+		           	<li class="point 1670" >
+						<a class="point" href="https://enter.shingu.ac.kr/index.do" title="" data-sub="N" target="_self" >
+						
+						
+						
+							입학홈페이지
+							
+						
+						
+						</a>
+		           		
+		           	</li>
+           	 	
+            </ul>
+		</nav>		
+		<p>
+			<a href="https://login.shingu.ac.kr" title="새창열림" target="_blank" id="btn_total">종합정보시스템</a>
+			
+				
+				
+					<a href="#;" title="로그인" id="btn_log" class="login" onclick="login()">로그인</a>
+				
+			
+			<button id="btn_search" class="btn_topSearch">검색</button>
+			<a href="https://english.shingu.ac.kr/index.do" title="새창열림" target="_blank" id="btn_lan">ENG</a>
+			<button id="btn_menu" class="btn_topSitemap">메뉴열기</button>
+		</p>
+		<form id="loginForm" method="post">
+			<input type="hidden" name="ReturnURL" value="http://www.shingu.ac.kr"/>
+		</form>
+	</header>
+</div>			
+
+		<div id="contents" class="sub">
+			<h2  style="background-image:url(/ajaxfile/CMN_SVC/FileView.do?GBN=X03&SITE_NO=2&MENU_NO=1380)"><b class="cont_tit">커뮤니티</b></h2>
+			
+
+<script>
+$(function(){
+	$(document).on("click", ".btn_print", function(){
+		window.print();
+	});
+});
+</script>
+<nav id="snb">
+	<div>
+		<a href="/" title="홈">홈</a>
+		
+			<button class="dep1" data-no="1">커뮤니티</button>
+			<ul id="snbLvl_1">
+				
+					<li data-menuno="10" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=10        " title="" target="_self">대학소개</a></li>
+				
+					<li data-menuno="320" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=320       " title="" target="_self">대학기관</a></li>
+				
+					<li data-menuno="670" data-sub="N"><a href="/cms/FR_CON/index.do?MENU_ID=670       " title="" target="_self">학과소개</a></li>
+				
+					<li data-menuno="1130" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=1130      " title="" target="_self">대학생활</a></li>
+				
+					<li data-menuno="1380" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=1380      " title="" target="_self">커뮤니티</a></li>
+				
+					<li data-menuno="1670" data-sub="N"><a href="https://enter.shingu.ac.kr/index.do" title="" target="_self">입학홈페이지</a></li>
+				
+			</ul>
+		
+		
+			<button class="dep2" data-no="2">신구소식</button>
+			<ul id="snbLvl_2">
+				
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+				
+					
+						
+					
+						
+					
+						
+					
+						
+					
+				
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+				
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+				
+					
+						
+							<li data-menuno="1390" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=1390      " title="" target="_self">신구소식</a></li>
+						
+					
+						
+							<li data-menuno="1440" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=1440      " title="" target="_self">캠퍼스톡톡</a></li>
+						
+					
+						
+							<li data-menuno="1460" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=1460      " title="" target="_self">동아리 톡톡</a></li>
+						
+					
+						
+							<li data-menuno="1590" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=1590      " title="" target="_self">묻고 답하기</a></li>
+						
+					
+						
+							<li data-menuno="1620" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=1620      " title="" target="_self">생활서비스</a></li>
+						
+					
+						
+							<li data-menuno="1650" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=1650      " title="" target="_self">포토갤러리</a></li>
+						
+					
+						
+							<li data-menuno="1660" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=1660      " title="" target="_self">동영상갤러리</a></li>
+						
+					
+				
+					
+				
+			</ul>
+		
+		
+			<button class="dep3" data-no="3">공지사항</button>
+			<ul id="snbLvl_3">
+				
+					
+						
+							
+						
+							
+						
+							
+						
+							
+						
+					
+						
+					
+						
+							
+						
+							
+						
+					
+						
+					
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+					
+						
+					
+						
+					
+						
+							
+						
+							
+						
+					
+						
+					
+						
+							
+						
+							
+						
+					
+				
+					
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+					
+				
+					
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+							
+						
+					
+						
+					
+				
+					
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+							
+						
+							
+						
+					
+						
+					
+						
+							
+						
+							
+						
+					
+						
+					
+						
+					
+						
+					
+						
+							
+						
+							
+						
+							
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+				
+					
+						
+							
+								<li data-menuno="1400" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=1400      " title="" target="_self">공지사항</a></li>
+							
+						
+							
+								<li data-menuno="1410" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=1410      " title="" target="_self">장학, 대출공지</a></li>
+							
+						
+							
+								<li data-menuno="2250" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=2250      " title="" target="_self">장애학생지원 공지</a></li>
+							
+						
+							
+								<li data-menuno="2370" data-sub="N"><a href="/cms/FR_CON/index.do?MENU_ID=2370      " title="" target="_self">건강 게시판</a></li>
+							
+						
+							
+								<li data-menuno="2380" data-sub="N"><a href="/cms/FR_CON/index.do?MENU_ID=2380      " title="" target="_self">심폐소생술</a></li>
+							
+						
+							
+								<li data-menuno="1420" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=1420      " title="" target="_self">입찰정보</a></li>
+							
+						
+							
+								<li data-menuno="1430" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=1430      " title="" target="_self">채용소식</a></li>
+							
+						
+							
+								<li data-menuno="2460" data-sub="Y"><a href="/cms/FR_CON/index.do?MENU_ID=2460      " title="" target="_self">공모전소식</a></li>
+							
+						
+					
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+					
+						
+							
+						
+							
+						
+					
+						
+					
+						
+					
+				
+					
+				
+			</ul>
+		
+		<p id="font-setting-buttons">
+			<button class="btn_share">공유하기</button>
+			<button class="btn_print">프린트하기</button>
+			<button class="btn_plus">텍스트 크게보기</button>
+			<button class="btn_minus">텍스트 작게보기</button>
+		</p>
+	</div>
+</nav>
+
+			<script>
+			var gnbDep1 = 0;
+			var gnbDep2 = 0;
+			var gnbDep3 = 0;
+			
+				gnbDep1 = 5;
+			
+			
+				gnbDep2 = 1;
+			
+			
+				gnbDep3 = 1;
+			
+			</script>
+			<h3>공지사항</h3>
+			
+			
+
+			<article>
+				<!--컨텐츠 위치-->
+	            
+
+<link rel="stylesheet" href="/sgu/css/board.css" />
+<!-- <link rel="stylesheet" href="/css/board.css" />
+<script src="/js/comm_fr.js"></script>
+<script src="/js/jquery.tmpl.js"></script>
+<script src="/js/util.js"></script> -->
+<script>
+var gbn = '';
+
+$().ready(function() {
+	
+	fn_detail();
+	
+
+	$(".btn_reply").click(function(){
+		$("#sendForm").attr("action", "BoardReplyWrite.do");
+	    $("#sendForm").submit();
+	});
+	
+	$(".shareArea .btnC_share").click(function(){
+		$(this).toggleClass('on');
+		$(".shareArea .shareBox").toggle();
+		shareBox_act();
+	});
+
+	$(".shareArea .shareBox li>a").click(function(){
+		$(".shareArea .shareBox").toggle();
+		shareBox_act();
+	});
+
+	$("div#dim").click(function(){
+		$(this).removeClass("on");
+		$(".shareArea .shareBox").toggle();
+	});
+
+	$(window).resize(function(){
+		if($(".shareArea .shareBox").css('display') == 'block'){
+			$(".shareArea .shareBox").toggle();
+			shareBox_act();
+		}
+	});
+	
+	$(document).on("click",".btnC_like", function(){
+		
+		fn_comm_ajax({
+            url : "/ajaxf/FR_BBS_SVC/BoardLike.do",
+            data : $("#sendForm").serialize(),
+            dataType : "json",
+            success : function(data) {
+                if(data == 1){
+                	fn_detail();
+                }else if(data == 3){
+                	alert("로그인 후 좋아요 하실 수 있습니다.");
+                }else{
+                    alert("좋아요에 실패했습니다. 관리자에 문의하세요.");
+                }
+            }
+        });
+		return false;
+	});
+	
+	$(document).on("click","button.btn_modi", function(){
+		
+        $("#sendForm").attr("action", "BoardWrite.do");
+	    $("#sendForm").submit();
+	});
+	$(document).on("click","button.btn_delete",function(){
+		
+        boardItemDel();
+    });
+	
+	$(document).on("click",".btnArea button.btn_list",function(){
+// 		$("#sendForm").attr("action", "/cms/FR_CON/index.do");
+// 	    $("#sendForm").submit();
+		location.href = "/cms/FR_CON/index.do?"+$("#sendForm").serialize();
+	});
+	
+	$(document).on("click","button.reply",function(){
+    	
+	    $("#sendForm input:hidden[name=P_BBS_SEQ]").val($("#sendForm input:hidden[name=BBS_SEQ]").val());
+	    $("#sendForm input:hidden[name=BBS_SEQ]").val("");
+	        
+		$("#sendForm").attr("action", "BoardReply.do");
+	    $("#sendForm").submit();
+    });
+	
+	$(document).on("click",".btn_preview",function(){
+		fn_comm_ajax({
+	        url : "/ajaxf/CMN_SVC/PreviewFile.do",
+	        data : $("#prvForm").serialize()+'&GBN=Y02&SITE_NO='+$(this).data("siteno")+'&BOARD_SEQ='+$(this).data("boardseq")+'&BBS_SEQ='+$(this).data("bbsseq")+'&FILE_SEQ='+$(this).data("fileseq"),
+	        dataType : "json",
+	        success : function(data) {
+	        	if(data.result == '1'){
+	        		window.open(data.previewUrl);
+	        	}else{
+	        		alert('미리보기에 실패했습니다. 관리자에게 문의하세요.');
+	        	}
+	        }
+	    });
+    });
+	
+	
+	//*************** 댓글 Function **************//
+	$(document).on("click",".btn .btn_upt", function(){
+		$(".replyArea .list fieldset").remove();
+		$(".replyArea .list p").show();
+		$(this).parents("li").find("p").hide();
+		$(".replyArea .list .btn").show();
+		$(this).parents("li").find(".btn").hide();
+		var modiTag = '<fieldset>';
+		modiTag += '<legend>댓글 수정</legend>';
+		modiTag += '<textarea class="inp_area" name="COMMENT_CONT" title="댓글 내용 수정창"></textarea>';
+		modiTag += '<div class="btn"><button class="btn_txtCancel btn_cancel" type="button">취소</button><button class="btn_txtWrite btn_save" type="button">등록</button></div>';
+		modiTag += '</fieldset>';
+		
+		$(modiTag).appendTo($(this).parents("li"));
+		$(this).parents("li").find("textarea[name=COMMENT_CONT]").val($(this).parents("li").find("p").data("conts"));
+	});
+	
+	$(document).on("click",".btn .btn_del", function(){
+		
+		if(!confirm("삭제하시겠습니까?")) {
+	        return;
+	    }
+		var idno = $(this).parents("li").data("idno");
+	    
+	    fn_comm_ajax({
+	        url : "/ajaxf/FR_BBS_SVC/BoardCommentDel.do",
+	        data : $("#commentForm").serialize()+"&COMMENT_SEQ="+idno,
+	        dataType : "json",
+	        success : function(data) {
+	        	if(data == 1){
+	        		$("#commentForm [name=pageNo]").val("1");
+                    fn_comment_list();
+                }else if(data == 2){
+                    alert("세션이 만료되었습니다.");
+                }else{
+                    alert("삭제에 실패했습니다. 관리자에 문의하세요.");
+                }
+	        }
+	    });
+	});
+	
+	$(document).on("click",".btn .btn_save", function(){
+		
+	    if($(this).parent().parent().find("textarea").val().trim() == ""){
+	        alert('댓글을 입력하세요.');
+	        return;
+	    }
+	    var idno = $(this).parents("li").data("idno");
+	    
+	    fn_comm_ajax({
+	        url : "/ajaxf/FR_BBS_SVC/BoardCommentModi.do",
+	        data : $("#commentForm").serialize()+"&COMMENT_SEQ="+idno,
+	        dataType : "json",
+	        success : function(data) {
+	            if(data == 1){
+	                fn_comment_list();
+	            }else if(data == 2){
+	                alert("세션이 만료되었습니다.");
+	            }else{
+	                alert("저장에 실패했습니다. 관리자에 문의하세요.");
+	            }
+	        }
+	    });
+	});
+	
+	$(document).on("click",".btn .btn_cancel", function(){
+		$(".replyArea .list fieldset").remove();
+		$(".replyArea .list p").show();
+		$(".replyArea .list .btn").show();
+	});
+	//*************** 댓글 Function **************//
+});
+
+function fn_view(pwd){
+	$("#sendForm [name=PWD]").val(pwd);
+	if(gbn == 'MODI'){
+		if($("#sendForm input:hidden[name=P_BBS_SEQ]").val() == ""){
+        	$("#sendForm").attr("action", "BoardWrite.do");
+    	    $("#sendForm").submit();
+        }else{
+        	var pBbsSeq = $("#sendForm input:hidden[name=P_BBS_SEQ]").val();
+        	$("#sendForm").attr("action", "BoardReply.do");
+    	    $("#sendForm").submit();
+        }
+	}else{
+		boardItemDel();
+	}
+}
+
+function fn_detail(){
+    if($("#sendForm input:hidden[name=BBS_SEQ]").val() == ''){
+        return;
+    }
+    
+    fn_comm_ajax({
+        url : "/ajaxf/FR_BBS_SVC/BoardViewData.do",
+        data : $("#sendForm").serialize()+"&CONTENTS_NO=1",
+        dataType : "json",
+        success : function(data) {
+        	
+        	console.log(data);
+            
+            $("#sendForm").fn_comm_setValue(data);
+            $("div.shareArea .btnC_like span").text(data.RECOMMS);
+            
+            var headerTag = '';
+            if(data.CATE_NM != null && data.CATE_NM != ''){
+            	headerTag = '<span class="mark_categ">['+data.CATE_NM+']</span> ';
+            }
+            headerTag += fn_util_htmlEncode(data.SUBJECT);
+			if("Y" == "Y" || "Y" == "Y" || "Y" == "Y"){
+	            headerTag += '<div class="txtInfo">';
+	            if("Y" == "Y"){
+	            	headerTag += '<span class="writer">작성자 '+data.WRITER_NM+'</span>';
+	            }
+	            if("Y" == "Y"){
+	            	headerTag += '<span class="date">등록일 '+data.WRITE_DT+'</span>';
+	            }
+	            if("Y" == "Y"){
+	            	headerTag += '<span class="view">조회수 '+data.HITS+'</span>';
+	            }
+	            headerTag += '</div>';
+			}
+            
+            $("div.BBSlist_v dt").html(headerTag);
+            
+            $("head meta[name=title]").attr("content",fn_util_htmlEncode(data.SUBJECT));
+            
+            var conts = '';
+            if(data.CONTENTS != null && data.CONTENTS.indexOf("<") == 0){
+            	
+                conts = $(data.CONTENTS).text();
+            }else{
+                conts = data.CONTENTS;
+            }
+            
+            $("head meta[name=description]").attr("content",conts);
+            
+            if(/<[a-z][\s\S]*>/i.test(data.CONTENTS)){ //에디터 작성글(html)인지 체크
+                $("div.view_txt").html(data.CONTENTS);
+            }else{
+            	if(data.CONTENTS != null){
+                    $("div.view_txt").html(data.CONTENTS.replace(/\n/g,"<br/>"));
+            	}
+           	}
+        }
+    });
+}
+
+function boardItemDel(){
+	if(!confirm("삭제하시겠습니까?")) {
+        return;
+    }
+    
+    fn_comm_ajax({
+        url : "/ajaxf/FR_BBS_SVC/BoardItemDel.do",
+        data : $("#sendForm").serialize(),
+        dataType : "json",
+        success : function(data) {
+            if(data == 1){
+                $("#sendForm").attr("action", "/cms/FR_CON/index.do");
+        	    $("#sendForm").submit();
+            }else if(data == 9){
+            	alert("삭제권한이 없습니다.");
+            }else{
+                alert("삭제에 실패했습니다. 관리자에 문의하세요.");
+            }
+        }
+    });
+}
+
+function textareaBytes(obj){
+	var text = $(obj).val();
+	$(obj).parents("fieldset").find("span").text(getTextBytes(text));
+}
+
+function getTextBytes(str){
+	var len = 0;
+	for(var i =0; i< str.length; i++){
+		if(escape(str.charAt(i)).length == 6){
+			len++;
+		}
+		len++;
+	}
+	return len;
+}
+
+function fn_comment_list(){
+    
+    fn_comm_ajax({
+        url : "/ajaxf/FR_BBS_SVC/BoardCommentListData.do",
+        data : $("#commentForm").serialize(),
+        dataType : "json",
+        success : function(data) {
+            fn_comm_setList("#tbody", data, "#listTemplate", "#noListTemplate", ".replyArea .num", ".pagination");
+            
+            if($("#commentForm .list li").length > 0){
+            	$("#tbody").show();
+            	$(".pagination").show();
+            }else{
+            	$("#tbody").hide();
+            	$(".pagination").hide();
+            }
+            
+            $("#commentForm .list li").each(function(){
+            	var org = $(this).find("p").text();
+            	$(this).find("p").html(org.replace(/\n/g,"<br/>"));
+        	});
+        }
+    });
+}
+
+function fn_comment_save(){
+    //validation check
+    if($("#commentForm textarea[name=CONTENTS]").val().trim() == ""){
+        alert('댓글을 입력하세요.');
+        return;
+    }
+    
+    if(!confirm("저장하시겠습니까?")) {
+        return;
+    }
+    
+    fn_comm_ajax({
+        url : "/ajaxf/FR_BBS_SVC/BoardCommentSave.do",
+        data : $("#commentForm").serialize(),
+        dataType : "json",
+        success : function(data) {
+            if(data == 1){
+                $("#commentForm textarea[name=CONTENTS]").val("");
+                fn_comment_list();
+            }else if(data == 2){
+            	alert("세션이 만료되었습니다.");
+            }else{
+                alert("저장에 실패했습니다. 관리자에 문의하세요.");
+            }
+        }
+    });
+}
+
+function linkPage(pageNo){
+    $("#commentForm [name='pageNo']").val(pageNo);
+    fn_comment_list();
+}
+
+function fileDown(obj){
+    location.href="/ajaxfile/FR_SVC/FileDown.do?GBN=X01&BOARD_SEQ="+$(obj).data("boardseq")+"&SITE_NO="+$(obj).data("siteno")+"&BBS_SEQ="+$(obj).data("bbsseq")+"&FILE_SEQ="+$(obj).data("fileseq");
+}
+
+function prev(){
+	$("#sendForm input:hidden[name=BBS_SEQ]").val($("#sendForm input:hidden[name=PREV_IDX]").val());
+	$("#sendForm").attr("action", "BoardView.do");
+    $("#sendForm").submit();
+}
+
+function next(){
+	$("#sendForm input:hidden[name=BBS_SEQ]").val($("#sendForm input:hidden[name=NEXT_IDX]").val());
+	$("#sendForm").attr("action", "BoardView.do");
+    $("#sendForm").submit();
+}
+
+function shareBox_act(){
+	if($("#dim").attr("class") == "on"){
+		$("#dim").removeClass("on");
+	}else{
+		$("#dim").addClass("on");
+	}
+}
+
+function shareSns(sns){
+	var snsTitle = '';
+	var snsItems = new Array();
+	var winOpt = new Array();
+	var snsUrl = 'https://www.shingu.ac.kr/cms/FR_BBS_CON/BoardView.do?MENU_ID=1400';
+	snsUrl += '&CONTENTS_NO=';
+	snsUrl += '&SITE_NO=2';
+	snsUrl += '&BOARD_SEQ=4';
+	snsUrl += '&BBS_SEQ=17703';
+	snsUrl += '&P_BBS_SEQ=';
+	snsUrl += '&SLFLAG=Y';
+	
+	snsItems['facebook'] = "http://www.facebook.com/share.php?t="+encodeURIComponent(snsTitle) + "&u=" + encodeURIComponent(snsUrl);
+	snsItems['twitter'] = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(snsTitle + "\n" + snsUrl);
+	snsItems['band'] = "http://www.band.us/plugin/share?body="+encodeURIComponent(snsUrl)+"&route="+encodeURIComponent(snsUrl);
+	snsItems['kakao'] = "https://story.kakao.com/share?url="+encodeURIComponent(snsUrl);
+	snsItems['google'] = "https://plus.google.com/share?url="+encodeURIComponent(snsUrl)+"&t=" + encodeURIComponent(snsTitle);
+	snsItems['blog'] = "http://blog.naver.com/openapi/share?url=" + encodeURIComponent(snsUrl) + "&title=" + encodeURIComponent(snsTitle);
+	snsItems['pinterest'] = "http://www.pinterest.com/pin/create/button/?url=" + encodeURIComponent(snsUrl) + "&description=" + encodeURIComponent(snsTitle);
+	snsItems['tumblr'] = "https://www.tumblr.com/widgets/share/tool?posttype=link&canonicalUrl=" + encodeURIComponent(snsUrl) + "&title=" + encodeURIComponent(snsTitle);
+	
+	winOpt['facebook'] = "width=600, height=500";
+	winOpt['twitter'] = "width=600, height=500";
+	winOpt['band'] = "width=500, height=500, resizable=yes";
+	winOpt['kakao'] = "width=500, height=500, resizable=yes";
+	winOpt['google'] = "width=500, height=500, resizable=yes";
+	winOpt['blog'] = "width=500, height=500, resizable=yes";
+	winOpt['pinterest'] = "width=700, height=700, resizable=yes";
+	winOpt['tumblr'] = "width=700, height=700, resizable=yes";
+	
+	var win = window.open(snsItems[sns], sns, winOpt[sns]);
+	if (win) {
+        win.focus();
+    }
+}
+
+
+</script>
+<!-- board -->
+<div class="board_area">
+	<form id="sendForm" method="post">
+	    <input type="hidden" name="MENU_ID" id="MENU_ID" value="1400"/>
+	    <input type="hidden" name="CONTENTS_NO" value=""/>
+	    <input type="hidden" name="SITE_NO" value="2"/>
+	    <input type="hidden" name="BOARD_SEQ" value="4"/>
+	    <input type="hidden" name="BBS_SEQ" value="17703"/>
+	    <input type="hidden" name="P_BBS_SEQ" />
+	    <input type="hidden" name="CATE_SEQ"/>
+		<input type="hidden" name="PWD" />
+	    <input type="hidden" name="pageNo" id="pageNo" value=""/>
+	    <input type="hidden" name="SEARCH_SEQ" value=""/>
+	    <input type="hidden" name="SEARCH_FLD" value=""/>
+	    <input type="hidden" name="SEARCH" value=""/>
+	    <input type="hidden" name="PREV_IDX" value="17546"/>
+	    <input type="hidden" name="NEXT_IDX" value="17693"/>
+	</form>
+	<div class="BBSlist_v">
+		<dl>
+			<dt></dt>
+			<dd>
+				<div class="view_txt"></div>
+				
+				<div class="fileArea">
+				
+					<p>
+						<a href="#;" title="다운로드" data-boardseq="4" data-siteno="2" data-bbsseq="17703" data-fileseq="1" onclick="fileDown(this);">[대구한의대학교] 청년 경제 토크콘서트 홍보 포스터.png</a>
+	                 	
+	                 </p>
+				
+				</div>
+				
+			</dd>
+		</dl>
+
+		<!-- 공유 -->
+		<div class="shareArea">
+			<div class="btnArea">
+			
+			
+			</div>
+
+			<div class="shareBox">
+				<ul>
+					<li><a href="#;" class="sns_facebook" title="새창열림" onclick="shareSns('facebook');">페이스북</a></li>
+	                <li><a href="#;" class="sns_band" title="새창열림" onclick="shareSns('band');">네이버밴드</a></li>
+	                <li><a href="#;" class="sns_twitter" title="새창열림" onclick="shareSns('twitter');">트위터</a></li>
+	                <li><a href="#;" class="sns_blog" title="새창열림" onclick="shareSns('blog');">네이버블로그</a></li>
+	                <li><a href="#;" class="sns_googlePlus" title="새창열림" onclick="shareSns('google');">구글+</a></li>
+	                <li><a href="#;" class="sns_tumblr" title="새창열림" onclick="shareSns('tumblr');">텀블러</a></li>
+	                <li><a href="#;" class="sns_kakaoStory" title="새창열림" onclick="shareSns('kakao');">카카오스토리</a></li>
+	                <li><a href="#;" class="sns_pinterest" title="새창열림" onclick="shareSns('pinterest')">핀터레스트</a></li>
+				</ul>
+			</div>
+		</div>
+		<!-- //공유 -->
+	</div>
+
+	<div class="btnArea">
+	
+	
+		<button type="button" class="btnC btnBlack btn_list"><span>목록</span></button>
+	</div>
+
+	
+
+	
+    
+    <!-- 이전글/다음글 -->
+    <div class="prevNnext">
+	    <ul>
+	        <li class="prev">
+	            <strong>이전글</strong>
+	        
+	            
+	            
+	            
+	                <p class="article">
+	            		
+						<a href="#;" onclick="prev();" title="이전글">2026학년도 공인외국어시험 응시료 지원금 신청 안내</a>
+					</p>
+	            
+	        
+	        </li>
+	        <li class="next">
+	            <strong>다음글</strong>
+	        
+	            
+	            
+	            
+	            	<p class="article">
+	            		
+						<a href="#;" onclick="next();" title="다음글">2026학년도 멀티미디어 공모전 수상자 발표 안내</a>
+					</p>
+	            
+	        
+	        </li>
+	    </ul>
+    </div>
+    <!-- //이전글/다음글 -->
+    
+    
+
+</div>
+<!-- //board -->
+<form id="prvForm" target="_blank"></form>
+
+	            <!--/컨텐츠 위치-->
+			</article>
+		</div>
+		
+
+
+<div id="footer">
+	<a href="#header" id="btn_top" title="TOP 맨 위로 페이지 이동 " >TOP</a>
+	<footer>
+		<div class="family_wrap">
+		<div class="family_cont">
+		<div id="familySite">
+			<p>
+			
+				
+				<a href="#familySite1" title="바로가기">부속기관 바로가기</a>
+				
+			
+				
+				<a href="#familySite2" title="바로가기">학과사이트 바로가기</a>
+				
+			
+			</p>
+		</div>
+		<!--pop-->
+		
+		
+		<div id="familySite1" class="pop_wrap" >
+			<section class="popLayout2">
+				<h1 class="popTit">부속기관</h1>
+				<div class="popConts">
+				<!-- 팝업 내용 입력-->
+				<div class="popInner">
+				<div class="pop_familySite">
+					<ul>
+					
+						
+							<li><a href="https://itld.shingu.ac.kr/" title="새창열림" target="_blank">교수학습개발원</a></li>
+						
+					
+						
+							<li><a href="https://global.shingu.ac.kr/" title="새창열림" target="_blank">국제교류원</a></li>
+						
+					
+						
+							<li><a href="https://seongnam.familynet.or.kr/center/index.do" title="새창열림" target="_blank">다문화가족지원센터</a></li>
+						
+					
+						
+							<li><a href="https://library.shingu.ac.kr/" title="새창열림" target="_blank">도서관</a></li>
+						
+					
+						
+							<li><a href="https://makerspace.shingu.ac.kr/index.do" title="새창열림" target="_blank">메이커스페이스</a></li>
+						
+					
+						
+							<li><a href="https://dentalclinic.shingu.ac.kr/index.do" title="새창열림" target="_blank">부속치과의원 </a></li>
+						
+					
+						
+							<li><a href="http://lms.shingu.ac.kr/sso/sso.php" title="새창열림" target="_blank">사이버캠퍼스</a></li>
+						
+					
+						
+							<li><a href="https://dietary4u.mfds.go.kr/seongnam/" title="새창열림" target="_blank">성남시 어린이급식관리<br>지원센터</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/html/goURL.html?link=http://kinder.shingu.ac.kr/" title="새창열림" target="_blank">신구대학교 부속유치원</a></li>
+						
+					
+						
+							<li><a href="https://www.sbg.or.kr/main/index.html?" title="새창열림" target="_blank">신구대학교 식물원</a></li>
+						
+					
+						
+							<li><a href="http://news.shingu.ac.kr/" title="새창열림" target="_blank">신구학보</a></li>
+						
+					
+						
+							<li><a href="https://journal.shingu.ac.kr/" title="새창열림" target="_blank">신문방송국</a></li>
+						
+					
+						
+							<li><a href="https://museum.shingu.ac.kr/" title="새창열림" target="_blank">우촌박물관</a></li>
+						
+					
+						
+							<li><a href="https://dorm.shingu.ac.kr" title="새창열림" target="_blank">우촌학사</a></li>
+						
+					
+						
+							<li><a href="https://sgbe.shingu.ac.kr" title="새창열림" target="_blank">창업교육센터</a></li>
+						
+					
+						
+							<li><a href="https://sgbi.shingu.ac.kr" title="새창열림" target="_blank">창업보육센터</a></li>
+						
+					
+						
+							<li><a href="https://cec.shingu.ac.kr" title="새창열림" target="_blank">평생교육원</a></li>
+						
+					
+						
+							<li><a href="https://service.shingu.ac.kr/" title="새창열림" target="_blank">학생서비스팀</a></li>
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+					</ul>
+				</div>
+				</div>
+				</div>
+				<button type="button" class="btn_popClose">창닫기</button>
+			</section>
+		</div>
+		
+		
+		<div id="familySite2" class="pop_wrap" >
+			<section class="popLayout2">
+				<h1 class="popTit">학과사이트</h1>
+				<div class="popConts">
+				<!-- 팝업 내용 입력-->
+				<div class="popInner">
+				<div class="pop_familySite">
+					<ul>
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/nursing.html" title="새창열림" target="_blank">간호학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/archi.html" title="새창열림" target="_blank">건축학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/vr.html" title="새창열림" target="_blank">게임콘텐츠과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/marketing.html" title="새창열림" target="_blank">마케팅학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/sgpt.html" title="새창열림" target="_blank">물리치료학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/makeup.html" title="새창열림" target="_blank">메이크업전공</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/contents.html" title="새창열림" target="_blank">미디어콘텐츠과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/bio.html" title="새창열림" target="_blank">바이오생명과학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/veterinarynursing.html" title="새창열림" target="_blank">반려동물보건과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/animal.html" title="새창열림" target="_blank">반려동물산업과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/radiotech.html" title="새창열림" target="_blank">방사선학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/health.html" title="새창열림" target="_blank">보건의료행정학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/geoinfo.html" title="새창열림" target="_blank">부동산지적학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/beauty.html" title="새창열림" target="_blank">뷰티디자인과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/photo.html" title="새창열림" target="_blank">사진영상콘텐츠과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/welfare.html" title="새창열림" target="_blank">사회복지학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/plant.html" title="새창열림" target="_blank">생태정원전공 </a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/tax.html" title="새창열림" target="_blank">세무회계학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/skincare.html" title="새창열림" target="_blank">스킨케어전공</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/sports.html" title="새창열림" target="_blank">스포츠재활과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/visual.html" title="새창열림" target="_blank">시각디자인과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/fn.html" title="새창열림" target="_blank">식품영양학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/interior.html" title="새창열림" target="_blank">실내건축과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/kidCare.html" title="새창열림" target="_blank">아동보육과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/media.html" title="새창열림" target="_blank">영상디자인과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/child.html" title="새창열림" target="_blank">유아교육학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/emergency.html" title="새창열림" target="_blank">응급구조학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/bmls.html" title="새창열림" target="_blank">임상병리학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/liberalstudies.html" title="새창열림" target="_blank">자율전공학과</a></li>
+						
+					
+						
+							<li><a href="https://enter.shingu.ac.kr/intro/occupational.html" title="새창열림" target="_blank">작업치료학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/garden.html" title="새창열림" target="_blank">정원문화산업전공</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/dentech.html" title="새창열림" target="_blank">치기공학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/denthygiene.html" title="새창열림" target="_blank">치위생학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/software.html" title="새창열림" target="_blank">컴퓨터소프트웨어과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/fashion.html" title="새창열림" target="_blank">패션디자인과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/arts.html" title="새창열림" target="_blank">프린트미디어과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/florist.html" title="새창열림" target="_blank">플로리스트전공</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/airline.html" title="새창열림" target="_blank">항공서비스과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/hairdesign.html" title="새창열림" target="_blank">헤어디자인전공</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/hotel.html" title="새창열림" target="_blank">호텔관광과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/fsm.html" title="새창열림" target="_blank">호텔제과제빵과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/hca.html" title="새창열림" target="_blank">호텔조리과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/ela.html" title="새창열림" target="_blank">환경조경학과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/ai.html" title="새창열림" target="_blank">AI데이터과</a></li>
+						
+					
+						
+							<li><a href="https://www.shingu.ac.kr/intro/esports.html" title="새창열림" target="_blank">e스포츠과</a></li>
+						
+					
+					</ul>
+				</div>
+				</div>
+				</div>
+				<button type="button" class="btn_popClose">창닫기</button>
+			</section>
+		</div>
+		
+		<!--/pop-->
+		
+		</div>
+		</div>
+		<div class="footer">
+			<ul>
+			
+				<li class="point">
+					<a href="/cms/FR_CON/index.do?MENU_ID=300" target="_self" title="">개인정보처리방침</a>
+				</li>
+			
+				<li >
+					<a href="https://www.academyinfo.go.kr/pubinfo/pubinfo1600/doInit.do?schlId=0000501" target="_blank" title="새창열림">대학정보공시</a>
+				</li>
+			
+				<li >
+					<a href="/cms/FR_CON/index.do?MENU_ID=1960" target="_self" title="">대학자체평가</a>
+				</li>
+			
+				<li >
+					<a href="/cms/FR_CON/index.do?MENU_ID=1950" target="_self" title="">이메일주소무단수집거부</a>
+				</li>
+			
+				<li >
+					<a href="/cms/FR_CON/index.do?MENU_ID=1420" target="_self" title="">입찰정보</a>
+				</li>
+			
+				<li >
+					<a href="/cms/FR_CON/index.do?MENU_ID=1430" target="_self" title="">채용정보</a>
+				</li>
+			
+				<li >
+					<a href="/cms/FR_CON/index.do?MENU_ID=2030" target="_self" title="">예결산공고</a>
+				</li>
+			
+				<li >
+					<a href="https://www.shingu.ac.kr/html/counsel/main.htm" target="_blank" title="새창열림">성희롱사이버신고센터</a>
+				</li>
+			
+				<li >
+					<a href="/attach/202003/1584404113393_0.pdf" target="_blank" title="새창열림">영상정보처리기기운영관리방침</a>
+				</li>
+			
+			</ul>
+			<address>
+			13174 성남시 중원구 광명로 377(금광2동 2685)
+<span>학교안내 : 010-0000-0000</span>
+<em>ⓒ 2019 Shingu College ALL RIGHTS RESERVED.</em>
+
+			</address>
+			<p>
+				
+					
+						<a href="https://support.kasfo.or.kr/" target="_blank" title="새창열림"><img src="/ajaxfile/CMN_SVC/FileView.do?GBN=X08&BASIC_SEQ=1&INFO_SEQ=1" alt="KASFO - 대학재정회계센터" /></a>
+					
+						<a href="https://www.moe.go.kr/main.do?s=moe" target="_blank" title="새창열림"><img src="/ajaxfile/CMN_SVC/FileView.do?GBN=X08&BASIC_SEQ=1&INFO_SEQ=3" alt="교육개혁6대과제" /></a>
+					
+						<a href="https://www.moe.go.kr/main.do?s=moe" target="_blank" title="새창열림"><img src="/ajaxfile/CMN_SVC/FileView.do?GBN=X08&BASIC_SEQ=1&INFO_SEQ=4" alt="교육부" /></a>
+					
+						<a href="https://www.mybudget.go.kr/" target="_blank" title="새창열림"><img src="/ajaxfile/CMN_SVC/FileView.do?GBN=X08&BASIC_SEQ=1&INFO_SEQ=6" alt="국민참여예산" /></a>
+					
+						<a href="https://www.youtube.com/channel/UCH1k7RHVSqG87vv6LXqGq5A?view_as=subscriber" target="_blank" title="새창열림"><img src="/ajaxfile/CMN_SVC/FileView.do?GBN=X08&BASIC_SEQ=1&INFO_SEQ=9" alt="youtube" /></a>
+					
+						<a href="https://instagram.com/shingucollege?igshid=1ijo8oib38um8 " target="_blank" title="새창열림"><img src="/ajaxfile/CMN_SVC/FileView.do?GBN=X08&BASIC_SEQ=1&INFO_SEQ=10" alt="instagram" /></a>
+					
+				
+				<span>
+				
+					
+						<a href="https://www.facebook.com/shingu.ac.kr/ " target="_blank" class="f" title="새창열림"><img src="/ajaxfile/CMN_SVC/FileView.do?GBN=X08_1&BASIC_SEQ=1&INFO_SEQ=1" alt="facebook"/></a>
+					
+						<a href="https://blog.naver.com/shingu1276" target="_blank" class="b" title="새창열림"><img src="/ajaxfile/CMN_SVC/FileView.do?GBN=X08_1&BASIC_SEQ=1&INFO_SEQ=2" alt="blog"/></a>
+					
+				
+				</span>
+			</p>
+		</div>
+	</footer>
+</div>
+
+
+	</div>
+    
+</body>
+</html>
