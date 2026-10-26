@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "shingu": {
+      "command": "node",
+      "args": ["<ABSOLUTE_PATH>/dist/index.js"],
+      "env": {
+        "SHINGU_ID": "학번",
+        "SHINGU_PW": "비밀번호"
+      }
+    }
+  }
+}
