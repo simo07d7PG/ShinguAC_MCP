@@ -119,11 +119,13 @@ export class CategoryService {
         const details = new Map<string, HomeworkDetail>();
         for (const row of rows) {
           // 연장 기한이 있으면 그때까지 제출 가능하므로 연장 기한 기준으로 상세 조회 대상을 정한다.
-          if (inRange(row.extendedDueAt ?? row.dueAt, from, to)) {
+          // 제출 시작 전(startAt > now)인 과제는 상세 없이 not_open으로 확정되므로 요청을 아낀다.
+          const notOpenYet = row.startAt !== null && new Date(row.startAt).getTime() > from;
+          if (!notOpenYet && inRange(row.extendedDueAt ?? row.dueAt, from, to)) {
             details.set(row.reportSeq, await fetchHomeworkDetail(this.session, row.reportSeq));
           }
         }
-        all.push(...buildAssignments(lecture, rows, details));
+        all.push(...buildAssignments(lecture, rows, details, this.now()));
       }
       return all;
     });

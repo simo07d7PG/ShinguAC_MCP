@@ -150,9 +150,12 @@ export function buildAssignments(
   lecture: EclassLecture,
   rows: HomeworkRow[],
   details?: Map<string, HomeworkDetail>,
+  now?: Date,
 ): Assignment[] {
   return rows.map((row) => {
     const detail = details?.get(row.reportSeq);
+    // 제출 시작 전인 과제는 상세를 열지 않아도 "기간 아님"으로 확정할 수 있다.
+    const notOpenYet = !detail && now !== undefined && row.startAt !== null && new Date(row.startAt).getTime() > now.getTime();
     const a: Assignment = {
       lectureSeq: lecture.lectureSeq,
       reportSeq: row.reportSeq,
@@ -162,7 +165,7 @@ export function buildAssignments(
       startAt: row.startAt,
       dueAt: effectiveDeadline(row.dueAt),
       extendedDueAt: effectiveDeadline(row.extendedDueAt),
-      submitStatus: detail ? detail.submitStatus : "unknown",
+      submitStatus: detail ? detail.submitStatus : notOpenYet ? "not_open" : "unknown",
       submittedCount: row.submittedCount ?? undefined,
       totalCount: row.totalCount ?? undefined,
       detailUrl: `/eclass/clas/room/homework/homeworkDetail?reportSeq=${row.reportSeq}`,

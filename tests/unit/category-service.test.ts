@@ -124,19 +124,19 @@ describe("CategoryService.getAssignments", () => {
     expect(res.data).toHaveLength(32);
     expect(res.data.every((a) => a.submitStatus === "not_submitted")).toBe(true);
 
-    // 스냅샷은 필터 전 전체(4과목 × 30건), 범위 밖 과제는 unknown
+    // 스냅샷은 필터 전 전체(4과목 × 30건); 범위 밖은 unknown, 제출 시작 전(34710)은 상세 없이 not_open
     const snap = await store.read("assignments");
     expect(snap?.fetchedAt).toBe("2026-10-26T12:00:00+09:00");
     expect(snap?.data).toHaveLength(120);
-    expect(snap?.data.find((a) => a.reportSeq === "34710")?.submitStatus).toBe("unknown");
+    expect(snap?.data.find((a) => a.reportSeq === "34710")?.submitStatus).toBe("not_open");
     expect(snap?.data.find((a) => a.reportSeq === "34771")?.submitStatus).toBe("not_submitted");
   });
 
   it("due_within_days 미지정: 상세는 14일 범위, 반환은 전체", async () => {
     const { service } = makeService();
     const res = await service.getAssignments();
-    // 연장기한(없으면 마감) 기준 14일 범위 → 과목당 12건
-    expect(paths("GET", "/eclass/clas/room/homework/homeworkDetail")).toHaveLength(48);
+    // 연장기한(없으면 마감) 기준 14일 범위 12건 중 제출 시작 전 1건(34710)은 상세 생략 → 과목당 11건
+    expect(paths("GET", "/eclass/clas/room/homework/homeworkDetail")).toHaveLength(44);
     expect(res.data).toHaveLength(120);
   });
 
