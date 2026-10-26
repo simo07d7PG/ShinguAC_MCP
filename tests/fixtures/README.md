@@ -44,4 +44,5 @@
 | `eclass/plan-view.html` | 수업계획서 | 연구실 포함 |
 | `eclass/board-list-notice.html` | 수업공지 목록 | |
 | `alarm/recv-list-empty.html` | PUSH수신함 | 빈 상태 |
-| `cms/BoardView.html` | 공개 CMS 공지 본문 | |
+| `cms/BoardView.html` | 공개 CMS 공지 페이지(정적: 첨부만) | 제목·본문은 ajax |
+| `cms/BoardViewData.json` | CMS `BoardViewData.do` ajax 응답 | 작성자·연락처·IP 마스킹 |

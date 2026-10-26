@@ -92,8 +92,10 @@
 - **학생에게 노출되는 출석 화면 없음**(사이드바·E클래스 전 메뉴 확인). 수업계획서에 출석 평가 비율 텍스트만 존재. → 사용자 결정(2026-10-26): `get_attendance`는 v1 제외.
 
 ### 3.7 공지 본문 (공개 CMS)
-- `GET http://www.shingu.ac.kr/cms/FR_BBS_CON/BoardView.do?MENU_ID=<1400|1410>&SITE_NO=2&BOARD_SEQ=<4|5>&BBS_SEQ=<id>` — 로그인 불필요(`https` 가능). 제목 `b.cont_tit`, 첨부 `div.fileArea`, 본문 컨테이너는 `#contents` 안(픽스처 `tests/fixtures/cms/BoardView.html`로 셀렉터 확정). 호스트 allowlist에 `www.shingu.ac.kr`(GET만) 추가 필요.
-- 공지 id 체계: `univ:<BBS_SEQ>`(대학공지), `scholarship:<BBS_SEQ>`(장학공지), `eclass:<lectureSeq>:<boardId>:<wrId>`(수업공지).
+- 페이지 `GET https://www.shingu.ac.kr/cms/FR_BBS_CON/BoardView.do?MENU_ID=<1400|1410>&SITE_NO=2&BOARD_SEQ=<4|5>&BBS_SEQ=<id>` — 로그인 불필요. **정적 HTML에는 제목·본문이 없고**(`b.cont_tit`은 메뉴명 "커뮤니티") JS `fn_detail()`이 ajax로 채운다. 첨부만 정적: `#contents div.fileArea a[data-boardseq][data-siteno][data-bbsseq][data-fileseq]` → `https://www.shingu.ac.kr/ajaxfile/FR_SVC/FileDown.do?GBN=X01&BOARD_SEQ=..&SITE_NO=..&BBS_SEQ=..&FILE_SEQ=..`.
+- 본문 ajax(실측 2026-10-26): **같은 세션 쿠키 필요**(페이지 GET으로 받은 쿠키 없이 호출하면 `{"data":""}`). `POST https://www.shingu.ac.kr/ajaxf/FR_BBS_SVC/BoardViewData.do`, `Content-Type: application/x-www-form-urlencoded`, 헤더 `X-Requested-With: XMLHttpRequest`, `Referer: <페이지 URL>`, 본문 = `#sendForm` 직렬화 + `CONTENTS_NO=1`: `MENU_ID, CONTENTS_NO=1, SITE_NO, BOARD_SEQ, BBS_SEQ, P_BBS_SEQ=, CATE_SEQ=, PWD=, pageNo=, SEARCH_SEQ=, SEARCH_FLD=, SEARCH=, PREV_IDX, NEXT_IDX`(PREV/NEXT는 페이지 hidden 값, 비워도 무방한지는 미확인). 응답 `{"data":{SUBJECT, CONTENTS(HTML), WRITER_NM, WRITE_DT, REG_DT, HITS, CATE_NM, EMAIL, PHONE, ...}}` → 픽스처 `tests/fixtures/cms/BoardViewData.json`(작성자·연락처·IP 마스킹). 따라서 `get_notice(univ/scholarship)`는 요청 2회(GET 페이지 → POST 데이터).
+- 호스트 allowlist에 `www.shingu.ac.kr`(GET+POST) 포함. 대시보드 href는 `http://`이므로 `https://`로 정규화해서 요청.
+- 공지 id 체계: `univ:<BBS_SEQ>`(대학공지, MENU_ID=1400/BOARD_SEQ=4), `scholarship:<BBS_SEQ>`(장학공지, MENU_ID=1410/BOARD_SEQ=5), `eclass:<lectureSeq>:<boardId>:<wrId>`(수업공지 — 강의실 진입 후 `GET /eclass/clas/board/detail?boardId=1&wrId=<wrId>`).
 
 ## 4. 요청 수 추정(첫 호출, 로그인 포함)
 
