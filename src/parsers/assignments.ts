@@ -133,6 +133,18 @@ export function parseHomeworkDetail(html: string): HomeworkDetail {
   return detail;
 }
 
+/**
+ * 포털 안내 규칙: 마감 시각이 00:00이면 실제로는 전날 23:59까지 제출해야 한다.
+ * `2026-10-27T00:00:00+09:00` → `2026-10-26T23:59:00+09:00`. 그 외 시각은 그대로.
+ */
+export function effectiveDeadline(iso: string | null): string | null {
+  if (!iso || !/T00:00:00\+09:00$/.test(iso)) return iso;
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number) as [number, number, number];
+  const prev = new Date(Date.UTC(y, m - 1, d - 1));
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  return `${prev.getUTCFullYear()}-${pad(prev.getUTCMonth() + 1)}-${pad(prev.getUTCDate())}T23:59:00+09:00`;
+}
+
 /** 목록 행 + (선택) 상세를 합쳐 스키마를 통과하는 Assignment 목록을 만든다. */
 export function buildAssignments(
   lecture: EclassLecture,
@@ -148,8 +160,8 @@ export function buildAssignments(
       professorName: lecture.professorName || undefined,
       title: row.title,
       startAt: row.startAt,
-      dueAt: row.dueAt,
-      extendedDueAt: row.extendedDueAt,
+      dueAt: effectiveDeadline(row.dueAt),
+      extendedDueAt: effectiveDeadline(row.extendedDueAt),
       submitStatus: detail ? detail.submitStatus : "unknown",
       submittedCount: row.submittedCount ?? undefined,
       totalCount: row.totalCount ?? undefined,
