@@ -56,6 +56,8 @@ const MAP = {
   "pages/_eclass_clas_info_intro_introView.html": "eclass/intro-view.html",
   "pages/_eclass_clas_info_plan_planView.html": "eclass/plan-view.html",
   "pages/_eclass_clas_board_list_boardId_1.html": "eclass/board-list-notice.html",
+  "pages/_eclass_clas_board_list_boardId_1_filled.html": "eclass/board-list-notice-filled.html",
+  "pages/_eclass_clas_board_detail_boardId_1_wrId_00000000000000000002.html": "eclass/board-detail-notice.html",
   "pages/_alarm_recv_list.html": "alarm/recv-list-empty.html",
   "cms/BoardView_17703.html": "cms/BoardView.html",
 };

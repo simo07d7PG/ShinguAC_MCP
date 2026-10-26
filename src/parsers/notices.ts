@@ -87,9 +87,14 @@ export function parseEclassBoardList(
     const $tr = $(tr);
     const wrId = $tr.attr("data-wr-id") ?? /[?&]wrId=(\w+)/.exec($tr.find("a[href*='wrId=']").attr("href") ?? "")?.[1];
     if (!wrId) return; // "데이터가 없습니다." 행 등
-    const cells = $tr.children("td").toArray().map((td) => text($(td)));
-    const title = cells[1] ?? "";
-    const date = cells.map((c) => parseKst(c)).find((d) => d !== null) ?? null;
+    const tds = $tr.children("td");
+    // 제목 셀의 "공지" 라벨(span.label)은 제외한다.
+    const title = text(tds.eq(1).clone().find("span.label").remove().end());
+    // 등록일시 셀은 data-origin-format="YYYYMMDDHHmmss" 14자리 원문
+    const dateCell = tds.filter("[data-role=date]").first();
+    const date = dateCell.length
+      ? parseCompactKst(text(dateCell))
+      : (tds.toArray().map((td) => parseKst(text($(td)))).find((d) => d !== null) ?? null);
     out.push(
       NoticeSummarySchema.parse({
         id: `eclass:${opts.lectureSeq}:${opts.boardId}:${wrId}`,
@@ -102,6 +107,39 @@ export function parseEclassBoardList(
     );
   });
   return out;
+}
+
+/** `YYYYMMDDHHmmss`(또는 `YYYYMMDDHHmm`, `YYYYMMDD`) 원문을 KST ISO로. */
+function parseCompactKst(raw: string): string | null {
+  const m = /^(\d{4})(\d{2})(\d{2})(\d{2})?(\d{2})?(\d{2})?$/.exec(raw.trim());
+  if (!m) return parseKst(raw);
+  const [, y, mo, d, h = "00", mi = "00", s = "00"] = m;
+  return parseKst(`${y}-${mo}-${d} ${h}:${mi}:${s}`);
+}
+
+/**
+ * E클래스 게시판(수업공지 등) 본문 화면. 제목은 `.panel-body h5`(라벨 제외), 등록일시·작성자는 `.panel-footer`,
+ * 본문은 두 번째 panel의 `div[style*="min-height"]`.
+ */
+export function parseEclassBoardDetail(html: string, summary: NoticeSummary): NoticeDetail {
+  const $ = load(stripComments(html));
+  const titleEl = $("form#detailFrm").nextAll(".panel").first().find(".panel-body h5").first();
+  if (titleEl.length === 0) throw new ParseError("eclass-board-detail", "form#detailFrm ~ .panel .panel-body h5", "제목");
+  const title = text(titleEl.clone().find("span.label").remove().end());
+  const dateRaw = text($(".panel-footer [data-role=date]").first());
+  const postedAt = dateRaw ? parseCompactKst(dateRaw) : summary.postedAt;
+  const bodyEl = $("form#detailFrm").nextAll(".panel").eq(1).find("div[style*='min-height']").first();
+  const body = bodyEl.length ? htmlToText($, bodyEl) : "";
+  const attachments: { name: string; url: string }[] = [];
+  bodyEl
+    .closest(".panel")
+    .find("a[href*='eClassDown'], a[href*='Down.jsp'], a[href*='fileDown']")
+    .each((_, a) => {
+      const name = text($(a));
+      const href = $(a).attr("href");
+      if (name && href) attachments.push({ name, url: new URL(href, "https://student.shingu.ac.kr").toString() });
+    });
+  return NoticeDetailSchema.parse({ ...summary, title: title || summary.title, postedAt, body, attachments });
 }
 
 const BLOCK_TAGS = "p,div,li,tr,h1,h2,h3,h4,h5,h6,ul,ol,table";

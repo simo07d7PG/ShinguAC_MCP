@@ -80,7 +80,9 @@
    - 둘 다 없음 → **제출 기간 아님**(시작 전 또는 종료)
    - 마감 해석 규칙(포털 안내문): 마감 시각이 `00:00`이면 전날 23:59까지.
    - 제출 상태는 상세 페이지에서만 알 수 있으므로 `get_assignments`는 목록 + (마감 임박/필터 대상) 상세 요청을 조합한다. 요청 수 = 1(홈) + 과목당 (1 진입 + 1 목록) + 상세 N. 비용을 줄이려면 상세는 `due_within_days` 범위 안의 과제에만 조회하고, 그 외는 `submitStatus: "unknown"`.
-5. **수업공지** `GET /eclass/clas/board/list?boardId=1` (목록) / `GET /eclass/clas/board/detail?boardId=1&wrId=<20자리>` (본문).
+5. **수업공지** `GET /eclass/clas/board/list?boardId=1` (목록) / `GET /eclass/clas/board/detail?boardId=1&wrId=<20자리>` (본문). 실측(2026-10-26, 게임그래픽응용 강의):
+   - 목록: `table.table-list` th=[No|제목|첨부|등록일시|작성자|조회], 행 `tr[data-board-id][data-wr-id=<20자리>]`. 제목 td에 `<span class="label label-danger">공지</span>` 접두 라벨이 있을 수 있음. **등록일시 td는 `data-role="date" data-origin-format="YYYYMMDDHHmmss"` 로 14자리 원문**(`20260903091226` 형식). 빈 상태는 "데이터가 없습니다." 행(Total 0). 픽스처 `eclass/board-list-notice-filled.html`.
+   - 본문: `form#detailFrm`(hidden `boardId`, `wrId`), 제목 `.panel-body h5`(라벨 span 제외), `.panel-footer`에 `등록일시 | <span data-role=date data-origin-format=YYYYMMDDHHmmss>`, `작성자 | 이름`, `조회수 | N`. 본문은 두 번째 `.panel .panel-body div[style*="min-height"]`. 첨부는 본문 아래 영역(픽스처에는 없음). 픽스처 `eclass/board-detail-notice.html`.
 
 ### 3.5 성적·학점
 - **성적조회(수강자료)** `GET /SSJ/SSJ018P/SSJ018P` — 현재 학기 수강 과목 표 th=[년도/학기|과목정보|점수|성적등급|이전과목년도학기|이전과목과목명|연락처확인강의평가]. "과목정보" = `과목명 / 과목코드 / 분반`, 다음 셀 `이수구분 / 학점 / 교수명`, 점수·등급은 학기 중 "성적미완료". 행 버튼 data: `data-yy`, `data-haggi`, `data-gwamog-cd`, `data-gaeseol-sosog-cd`, `data-hagnyeon`, `data-bunban`, `data-gbn`. 모달 ajax `/SSJ/SSJ018P/SSJ018P1`(강의평가), `/SSJ/SSJ018P/SSJ018P2` — 사용하지 않음.

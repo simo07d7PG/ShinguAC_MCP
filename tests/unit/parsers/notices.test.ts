@@ -4,6 +4,7 @@ import {
   buildCmsUrl,
   parseCmsNoticeDetail,
   parseDashboardNotices,
+  parseEclassBoardDetail,
   parseEclassBoardList,
   parseNoticeId,
 } from "../../../src/parsers/notices.js";
@@ -123,5 +124,41 @@ describe("parseNoticeId / buildCmsUrl", () => {
       const p = parseNoticeId(n.id);
       expect(buildCmsUrl(p.category as "univ" | "scholarship", p.bbsSeq!)).toBe(n.url);
     }
+  });
+});
+
+describe("parseEclassBoardList — 실제 행 픽스처", () => {
+  const opts = { lectureSeq: "28153", boardId: "1", courseName: "게임그래픽응용" };
+  const rows = parseEclassBoardList(fx("eclass/board-list-notice-filled.html"), opts);
+
+  it("2건, 라벨 제외 제목, 14자리 등록일시 파싱", () => {
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      category: "eclass",
+      title: "3ds max 설치 링크 (교육용으로 설치)",
+      postedAt: "2026-09-03T10:12:26+09:00",
+      courseName: "게임그래픽응용",
+    });
+    expect(rows[0]?.id).toMatch(/^eclass:28153:1:\d{20}$/);
+    expect(rows[0]?.url).toMatch(/^\/eclass\/clas\/board\/detail\?boardId=1&wrId=\d{20}$/);
+    expect(rows[1]?.title).toBe("구글 드라이브");
+    for (const r of rows) expect(NoticeSummarySchema.safeParse(r).success).toBe(true);
+  });
+});
+
+describe("parseEclassBoardDetail", () => {
+  const summary = parseEclassBoardList(fx("eclass/board-list-notice-filled.html"), {
+    lectureSeq: "28153",
+    boardId: "1",
+    courseName: "게임그래픽응용",
+  })[0]!;
+  const detail = parseEclassBoardDetail(fx("eclass/board-detail-notice.html"), summary);
+
+  it("제목·등록일시·본문", () => {
+    expect(detail.title).toBe("3ds max 설치 링크 (교육용으로 설치)");
+    expect(detail.postedAt).toBe("2026-09-03T10:12:26+09:00");
+    expect(detail.body).toContain("autodesk.com");
+    expect(detail.attachments).toEqual([]);
+    expect(NoticeDetailSchema.safeParse(detail).success).toBe(true);
   });
 });
