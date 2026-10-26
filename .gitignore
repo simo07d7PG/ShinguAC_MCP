@@ -17,3 +17,6 @@ tests/fixtures/raw/
 !.omc/skills/
 !.omc/specs/
 !.omc/plans/
+
+# 로컬 Claude Code 등록(경로가 사용자마다 다름)
+.mcp.json
