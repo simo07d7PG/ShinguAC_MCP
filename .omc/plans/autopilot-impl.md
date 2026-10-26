@@ -244,7 +244,7 @@ WI-4가 사람 선행조건 때문에 대기하더라도 WI-5·WI-7은 진행 �
   - 입력 스키마:
     - `get_assignments({ due_within_days?: int 0..365 })` — 지정 시 `now ≤ dueAt ≤ now + N일`(KST), 미지정 시 전체. `dueAt`이 null인 항목은 지정 시 제외. 동작을 설명에 명시.
     - `get_timetable({ week?: "YYYY-MM-DD" })` — 해당 날짜가 속한 주(월~일)의 요일별 항목에 실제 날짜를 붙여 반환. 기본 이번 주(KST). 포털 시간표가 학기 고정이면 날짜 라벨만 달라짐을 설명에 명시.
-    - `get_courses({ include_contacts?: boolean = true })`, `refresh_snapshots({})` (`get_attendance` 제외)
+    - `get_courses({ include_contacts?: boolean = false })` (실측상 연락처 수집이 과목당 약 7초라 기본 false, 2026-10-26), `refresh_snapshots({})` (`get_attendance` 제외)
     - `get_notices({ category?: string, limit?: int 1..100 = 20 })`, `get_notice({ id: string })`
     - `get_grades({ semester?: string })` — 형식(예: `2026-2`)은 WI-4 결과로 확정, 설명에 예시 노출.
   - 출력: 조회 도구는 `{ <data>, fetchedAt, stale, source, warning? }`. `refresh_snapshots`는 `{ results:[...], fetchedAt }`.
