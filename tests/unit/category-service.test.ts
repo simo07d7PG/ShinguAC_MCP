@@ -337,3 +337,23 @@ describe("스냅샷 비밀번호 비노출", () => {
     }
   });
 });
+
+describe("CategoryService.getAssignment", () => {
+  it("강의 진입 후 상세를 가져오고 본문·첨부·제출 상태를 반환한다", async () => {
+    const { service } = makeService();
+    const res = await service.getAssignment({ reportSeq: "34771", lectureSeq: "27962" });
+    expect(res.meta.source).toBe("live");
+    expect(res.data.reportSeq).toBe("34771");
+    expect(res.data.lectureSeq).toBe("27962");
+    expect(res.data.title.length).toBeGreaterThan(0);
+    expect(typeof res.data.body).toBe("string");
+    expect(["submitted", "not_submitted", "not_open"]).toContain(res.data.submitStatus);
+    expect(paths("POST", "/eclass/clas/home")).toHaveLength(1);
+    expect(paths("GET", "/eclass/clas/room/homework/homeworkDetail")).toHaveLength(1);
+  });
+
+  it("lecture_seq가 없고 스냅샷에도 없으면 안내 오류", async () => {
+    const { service } = makeService();
+    await expect(service.getAssignment({ reportSeq: "999" })).rejects.toThrow(/get_assignments/);
+  });
+});

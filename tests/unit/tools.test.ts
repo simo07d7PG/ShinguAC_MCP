@@ -39,6 +39,16 @@ const grades: Grades = { semesters: [], credits: [], current: [] };
 function mockService(): { [K in keyof ToolService]: ReturnType<typeof vi.fn> } {
   return {
     getAssignments: vi.fn(async () => ({ data: [assignment], meta: LIVE })),
+    getAssignment: vi.fn(async () => ({
+      data: {
+        ...assignment,
+        body: "본문",
+        attachments: [{ name: "a.pdf", url: "https://cec.shingu.ac.kr/x" }],
+        scored: false,
+        submitStatus: "not_submitted" as const,
+      },
+      meta: LIVE,
+    })),
     getTimetable: vi.fn(async () => ({ data: entries, meta: LIVE })),
     getCourses: vi.fn(async () => ({ data: [course], meta: LIVE })),
     getNotices: vi.fn(async () => ({ data: [notice], meta: STALE })),
@@ -84,6 +94,7 @@ function structured(res: CallToolResult): Record<string, unknown> {
 }
 
 const TOOL_NAMES = [
+  "get_assignment",
   "get_assignments",
   "get_courses",
   "get_grades",
@@ -94,7 +105,7 @@ const TOOL_NAMES = [
 ];
 
 describe("tools/list", () => {
-  it("7개 도구와 입력·출력 스키마, 출처 표기를 노출한다", async () => {
+  it("8개 도구와 입력·출력 스키마, 출처 표기를 노출한다", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(TOOL_NAMES);
     for (const t of tools) {
@@ -120,6 +131,7 @@ describe("tools/list", () => {
 describe("조회 도구", () => {
   it.each([
     ["get_assignments", {}],
+    ["get_assignment", { report_seq: "10" }],
     ["get_timetable", {}],
     ["get_courses", {}],
     ["get_notices", {}],

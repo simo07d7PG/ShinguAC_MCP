@@ -26,6 +26,7 @@ import { currentAcademicTerm, parseSemesterArg } from "../portal/semester.js";
 import { fetchTimetable } from "../portal/timetable.js";
 import type {
   Assignment,
+  AssignmentDetail,
   Category,
   CategoryData,
   Course,
@@ -203,6 +204,45 @@ export class CategoryService {
       .map(({ n }) => n)
       .slice(0, opts.limit ?? 20);
     return { ...result, data };
+  }
+
+  /**
+   * 과제 상세(본문·첨부·제출 상태): 강의 진입 + 상세 = 2요청.
+   * lectureSeq가 없으면 assignments 스냅샷에서 reportSeq로 찾는다(get_assignments를 먼저 호출해야 함).
+   * 상세는 스냅샷을 두지 않으므로 포털 장애 시 fallback 없이 오류를 반환한다.
+   */
+  async getAssignment(opts: { reportSeq: string; lectureSeq?: string }): Promise<Result<AssignmentDetail>> {
+    const reportSeq = opts.reportSeq.trim();
+    if (!/^\d+$/.test(reportSeq)) throw new Error(`report_seq는 숫자여야 합니다: ${reportSeq}`);
+    const known = (await this.store.read("assignments"))?.data.find((a) => a.reportSeq === reportSeq);
+    const lectureSeq = opts.lectureSeq?.trim() || known?.lectureSeq;
+    if (!lectureSeq) {
+      throw new Error(
+        `과제 ${reportSeq}의 강의(lecture_seq)를 알 수 없습니다. get_assignments를 먼저 호출하거나 lecture_seq를 함께 주세요.`,
+      );
+    }
+    if (!/^\d+$/.test(lectureSeq)) throw new Error(`lecture_seq는 숫자여야 합니다: ${lectureSeq}`);
+    const fetchedAt = nowKst(this.now());
+    await enterLecture(this.session, lectureSeq);
+    const d = await fetchHomeworkDetail(this.session, reportSeq);
+    const data: AssignmentDetail = {
+      lectureSeq,
+      reportSeq,
+      courseName: known?.courseName,
+      title: d.title,
+      startAt: d.startAt,
+      dueAt: d.dueAt,
+      extendedDueAt: d.extendedDueAt,
+      penaltyNote: d.penaltyNote,
+      submittedCount: d.submittedCount ?? undefined,
+      totalCount: d.totalCount ?? undefined,
+      body: d.body,
+      attachments: d.attachments,
+      submitStatus: d.submitStatus,
+      scored: d.scored,
+      detailUrl: `/eclass/clas/room/homework/homeworkDetail?reportSeq=${reportSeq}`,
+    };
+    return { data, meta: { fetchedAt, stale: false, source: "live" } };
   }
 
   /** 공지 본문: univ/scholarship → 공개 CMS 2요청(로그인 없음), eclass → 진입 + 본문 2요청. */

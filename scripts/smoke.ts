@@ -38,6 +38,16 @@ results.push(await call("get_assignments", { due_within_days: 7 }, (sc) => {
   for (const a of d) by[a.submitStatus] = (by[a.submitStatus] ?? 0) + 1;
   return `n=${d.length} ${JSON.stringify(by)}`;
 }));
+{
+  // 첫 과제의 상세(본문·첨부) — get_assignments 결과의 reportSeq/lectureSeq 사용
+  const first = ((await client.callTool({ name: "get_assignments", arguments: { due_within_days: 14 } })).structuredContent as { data: { reportSeq: string; lectureSeq: string }[] }).data[0];
+  if (first) {
+    results.push(await call("get_assignment", { report_seq: first.reportSeq, lecture_seq: first.lectureSeq }, (sc) => {
+      const d = sc["data"] as { body: string; attachments: unknown[]; submitStatus: string };
+      return `body.len=${d.body.length} attachments=${d.attachments.length} status=${d.submitStatus}`;
+    }));
+  }
+}
 results.push(await call("get_timetable", {}, (sc) => `entries=${len(sc)} week=${JSON.stringify(sc["week"])}`));
 results.push(await call("get_courses", {}, (sc) => `n=${len(sc)}`));
 let firstNotice: string | undefined;

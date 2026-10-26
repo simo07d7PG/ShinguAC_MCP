@@ -43,7 +43,7 @@ describe("자격증명 없이 기동한 서버", () => {
     await Promise.all([server.connect(serverT), client.connect(clientT)]);
 
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(7);
+    expect(tools).toHaveLength(8);
 
     const res = (await client.callTool({ name: "get_assignments", arguments: {} })) as CallToolResult;
     expect(res.isError).toBe(true);
@@ -111,7 +111,7 @@ describe("stdio 프로세스", () => {
       send({ jsonrpc: "2.0", method: "notifications/initialized" });
       send({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
       const list = await waitFor(2);
-      expect((list["result"] as { tools: unknown[] }).tools).toHaveLength(7);
+      expect((list["result"] as { tools: unknown[] }).tools).toHaveLength(8);
 
       for (const line of stdout.split("\n").filter((l) => l.trim())) {
         expect((JSON.parse(line) as { jsonrpc: string }).jsonrpc).toBe("2.0");
