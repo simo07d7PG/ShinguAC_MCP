@@ -26,7 +26,7 @@ export class RequestQueue {
   private lastFinishedAt: number | null = null;
 
   constructor(options: RequestQueueOptions = {}) {
-    this.minGapMs = options.minGapMs ?? 500;
+    this.minGapMs = options.minGapMs ?? 200;
     this.timeoutMs = options.timeoutMs ?? 15000;
     this.maxRetries = options.maxRetries ?? 1;
     this.now = options.now ?? Date.now;

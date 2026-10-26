@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 describe("RequestQueue", () => {
-  it("5개 동시 enqueue: 동시성 1, 시작은 이전 완료 + 500ms 이후", async () => {
+  it("5개 동시 enqueue: 동시성 1, 시작은 이전 완료 + 200ms 이후", async () => {
     const q = new RequestQueue();
     let running = 0;
     let maxRunning = 0;
@@ -30,7 +30,7 @@ describe("RequestQueue", () => {
     expect(maxRunning).toBe(1);
     expect(starts).toHaveLength(5);
     for (let i = 1; i < 5; i++) {
-      expect(starts[i]! - ends[i - 1]!).toBeGreaterThanOrEqual(500);
+      expect(starts[i]! - ends[i - 1]!).toBeGreaterThanOrEqual(200);
     }
   });
 
@@ -38,7 +38,7 @@ describe("RequestQueue", () => {
     const q = new RequestQueue();
     const fn = vi.fn(() => new Promise<never>(() => {}));
     const result = q.enqueue(fn).catch((e: unknown) => e);
-    await vi.advanceTimersByTimeAsync(15_000 + 500 + 15_000);
+    await vi.advanceTimersByTimeAsync(15_000 + 200 + 15_000);
     expect(await result).toBeInstanceOf(TimeoutError);
     expect(fn).toHaveBeenCalledTimes(2);
   });
