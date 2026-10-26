@@ -1,0 +1,19 @@
+# 비밀값 — 절대 커밋 금지
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+coverage/
+*.log
+
+# 포털 원본 HTML(마스킹 전) — 커밋 금지. 마스킹된 픽스처만 tests/fixtures/ 에 둔다
+tests/fixtures/raw/
+
+# OMC 런타임 상태 (프로젝트 스킬은 예외)
+.omc/*
+!.omc/skills/
+!.omc/specs/
+!.omc/plans/
