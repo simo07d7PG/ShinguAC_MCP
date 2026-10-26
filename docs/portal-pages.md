@@ -18,7 +18,7 @@
 | 6 | `POST https://student.shingu.ac.kr/ssoLogin` (위 필드) | `302 → /dashboard/dashboard` | 포털이 `access_token` 쿠키(Domain=shingu.ac.kr)로 로그인 처리. 쿠키 jar가 **Domain 속성을 반영**해야 성공한다(호스트별 저장만 하면 `/notlogin/t`로 되돌아감). |
 | 7 | `GET https://student.shingu.ac.kr/dashboard/dashboard` | `200` (약 68KB) | 로그인 완료. |
 
-- 총 hop: 7요청(큐 간격 500ms 포함 약 5~7초).
+- 총 hop: 7요청. **실측(2026-10-26, 구현 모듈 `scripts/recon-login.ts`): 로그인 포함 첫 대시보드 응답 4.8초, 세션 재사용 시 0.7초.**
 - **세션 만료 판정:** 응답 최종 URL에 `/notlogin/` 포함 또는 HTML에 `id="ssoRedFrm"` 존재. 만료 페이지 JS: `duplicateLogin`, `returnType`, `autoLoginYN` 변수. `duplicateLogin == 'Y'`면 `alert("중복로그인으로 현재 세션이 종료되었습니다.")`.
 - **자격증명 거부 판정(미실측, 계정 잠금 위험으로 생략):** 4단계 응답이 302 `/login/userDiv`가 아니고 login 호스트에 머물며 `toastr.error(...)` 문구가 있으면 거부로 본다. 구현 시 "302가 아님 + 포털 복귀 실패"를 거부로 처리하고, 프로세스 생존 동안 재시도하지 않는다.
 - **중복 로그인 정책(실측): 허용형.** 세션 A로 로그인 → 같은 계정으로 세션 B 로그인 → A로 대시보드 요청 → 정상 200(A 유지). 즉 MCP 로그인이 브라우저 세션을 끊지 않는다(적어도 로그인 직후에는). `duplicateLogin` 분기는 코드에 존재하므로 README에는 "끊길 수 있음"으로 보수적으로 안내한다.
