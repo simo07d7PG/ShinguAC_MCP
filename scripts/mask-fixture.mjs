@@ -60,6 +60,8 @@ const MAP = {
   "pages/_eclass_clas_board_detail_boardId_1_wrId_00000000000000000002.html": "eclass/board-detail-notice.html",
   "pages/_alarm_recv_list.html": "alarm/recv-list-empty.html",
   "cms/BoardView_17703.html": "cms/BoardView.html",
+  "archive/board-list-3-L3.html": "eclass/board-list-material.html",
+  "archive/board-detail-3-L3-00000000000000000024.html": "eclass/board-detail-material-attach.html",
 };
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

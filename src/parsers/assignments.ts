@@ -27,6 +27,8 @@ export interface HomeworkDetail {
   submittedCount: number | null;
   totalCount: number | null;
   body: string;
+  /** 과제내용 칸의 원본 HTML. */
+  bodyHtml: string;
   attachments: { name: string; url: string }[];
   submitStatus: SubmitStatus;
   scored: boolean;
@@ -124,6 +126,7 @@ export function parseHomeworkDetail(html: string): HomeworkDetail {
     submittedCount,
     totalCount,
     body: text(cell("과제내용")),
+    bodyHtml: (cell("과제내용").html() ?? "").trim(),
     attachments,
     submitStatus,
     scored,

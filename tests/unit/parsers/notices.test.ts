@@ -2,10 +2,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   buildCmsUrl,
+  parseBoardPaging,
   parseCmsNoticeDetail,
   parseDashboardNotices,
   parseEclassBoardDetail,
   parseEclassBoardList,
+  parseEclassBoardPost,
   parseNoticeId,
 } from "../../../src/parsers/notices.js";
 import { NoticeDetailSchema, NoticeSummarySchema } from "../../../src/schema/notice.js";
@@ -160,5 +162,45 @@ describe("parseEclassBoardDetail", () => {
     expect(detail.body).toContain("autodesk.com");
     expect(detail.attachments).toEqual([]);
     expect(NoticeDetailSchema.safeParse(detail).success).toBe(true);
+  });
+});
+
+describe("자료실(boardId=3) — 첨부가 있는 글", () => {
+  it("목록: 10행(페이지당), 라벨 제외 제목, Total 26 / 3페이지", () => {
+    const rows = parseEclassBoardList(fx("eclass/board-list-material.html"), {
+      lectureSeq: "27962",
+      boardId: "3",
+      courseName: "UI화면설계",
+    });
+    expect(rows).toHaveLength(10);
+    expect(rows[0]!.id).toMatch(/^eclass:27962:3:\d{20}$/);
+    expect(rows[0]!.title.startsWith("일반")).toBe(false);
+    expect(rows[0]!.postedAt).toBe("2026-10-26T12:15:35+09:00");
+    expect(parseBoardPaging(fx("eclass/board-list-material.html"))).toEqual({ total: 26, page: 1, pages: 3 });
+  });
+
+  it("본문: 첨부 패널이 있어도 본문·첨부 3건·작성자·등록일시를 읽는다", () => {
+    const post = parseEclassBoardPost(fx("eclass/board-detail-material-attach.html"));
+    expect(post.postedAt).toBe("2026-10-12T22:09:42+09:00");
+    expect(post.author).toBe("이교수");
+    expect(post.attachments.map((a) => a.name)).toEqual([
+      "03 Ch10_스타일 가이드_color_typograhy_ (1).pptx",
+      "02 색채_톤의 배색 이미지.pptx",
+      "01 색채_톤의 이해.pptx",
+    ]);
+    expect(post.attachments.every((a) => a.url.startsWith("https://cec.shingu.ac.kr/01shingu/eClassDown.jsp?file_key="))).toBe(true);
+    expect(post.body.length).toBeGreaterThan(0);
+    expect(post.bodyHtml).toMatch(/</);
+  });
+
+  it("첨부 없는 수업공지도 같은 구조로 읽는다(작성자 마스킹 값)", () => {
+    const post = parseEclassBoardPost(fx("eclass/board-detail-notice.html"));
+    expect(post.title).toBe("3ds max 설치 링크 (교육용으로 설치)");
+    expect(post.attachments).toEqual([]);
+    expect(post.bodyHtml).toContain("autodesk.com");
+  });
+
+  it("페이지 표시가 없으면 한 페이지", () => {
+    expect(parseBoardPaging("<html><body>없음</body></html>")).toEqual({ total: 0, page: 1, pages: 1 });
   });
 });

@@ -88,7 +88,13 @@
 
 5. **수업공지** `GET /eclass/clas/board/list?boardId=1` (목록) / `GET /eclass/clas/board/detail?boardId=1&wrId=<20자리>` (본문). 실측(2026-10-26, 게임그래픽응용 강의):
    - 목록: `table.table-list` th=[No|제목|첨부|등록일시|작성자|조회], 행 `tr[data-board-id][data-wr-id=<20자리>]`. 제목 td에 `<span class="label label-danger">공지</span>` 접두 라벨이 있을 수 있음. **등록일시 td는 `data-role="date" data-origin-format="YYYYMMDDHHmmss"` 로 14자리 원문**(`20260903091226` 형식). 빈 상태는 "데이터가 없습니다." 행(Total 0). 픽스처 `eclass/board-list-notice-filled.html`.
-   - 본문: `form#detailFrm`(hidden `boardId`, `wrId`), 제목 `.panel-body h5`(라벨 span 제외), `.panel-footer`에 `등록일시 | <span data-role=date data-origin-format=YYYYMMDDHHmmss>`, `작성자 | 이름`, `조회수 | N`. 본문은 두 번째 `.panel .panel-body div[style*="min-height"]`. 첨부는 본문 아래 영역(픽스처에는 없음). 픽스처 `eclass/board-detail-notice.html`.
+   - 본문: `form#detailFrm`(hidden `boardId`, `wrId`), 제목 `.panel-body h5`(라벨 span 제외), `.panel-footer`에 `등록일시 | <span data-role=date data-origin-format=YYYYMMDDHHmmss>`, `작성자 | 이름`, `조회수 | N`. 본문은 `div[style*="min-height"]`(첨부 없으면 두 번째 패널). 픽스처 `eclass/board-detail-notice.html`.
+6. **자료실** `boardId=3` — 수업공지와 같은 게시판 템플릿. 실측(2026-10-27, UI화면설계 강의 26건):
+   - 목록은 **페이지당 10행**, 하단 `Total N` + `p / P Page`, 페이지 이동은 `GET ...list?boardId=3&pageIndex=<n>`(`form[name=searchFrm]` 필드 `boardId·pageIndex·wrId·searchText`). 제목 td 라벨은 `일반`. 첨부 td에 아이콘이 있으면 첨부 있음. 픽스처 `eclass/board-list-material.html`.
+   - 본문: **첨부가 있으면 제목 패널과 본문 패널 사이에 첨부 패널이 하나 더 생긴다**(패널 3개, 본문은 세 번째). 첨부 링크 `a[href^="https://cec.shingu.ac.kr/01shingu/eClassDown.jsp?file_key="]`, 이름은 `span.pl5`. 픽스처 `eclass/board-detail-material-attach.html`(첨부 3건).
+7. **첨부 다운로드** (실측 2026-10-27):
+   - 게시판·과제 첨부 `cec.shingu.ac.kr/01shingu/eClassDown.jsp?file_key=` → 200 `application/octet-stream`, `Content-Disposition: attachment;filename*=utf-8''<퍼센트 인코딩>`, `Content-Length` 있음. **쿠키 없이도 받아진다**(file_key가 곧 접근 권한 — 노출 주의). 56MB 파일 21초(일반 요청 타임아웃 15초로는 부족).
+   - 내가 제출한 첨부: `editModal`의 `data-file-master-key` → `GET /file/info?fileMasterKey=` → `fileDetails[].{fileKey, oriFileNm, fileSize, fileContentType}` → `GET /file/download?fileKey=<fileKey>`(리다이렉트 1회 후 200). **이것도 쿠키 없이 받아진다.** `Content-Disposition` 파일명은 인코딩이 깨져 있으므로 `oriFileNm`을 쓴다.
 
 ### 3.5 성적·학점
 - **성적조회(수강자료)** `GET /SSJ/SSJ018P/SSJ018P` — 현재 학기 수강 과목 표 th=[년도/학기|과목정보|점수|성적등급|이전과목년도학기|이전과목과목명|연락처확인강의평가]. "과목정보" = `과목명 / 과목코드 / 분반`, 다음 셀 `이수구분 / 학점 / 교수명`, 점수·등급은 학기 중 "성적미완료". 행 버튼 data: `data-yy`, `data-haggi`, `data-gwamog-cd`, `data-gaeseol-sosog-cd`, `data-hagnyeon`, `data-bunban`, `data-gbn`. 모달 ajax `/SSJ/SSJ018P/SSJ018P1`(강의평가), `/SSJ/SSJ018P/SSJ018P2` — 사용하지 않음.

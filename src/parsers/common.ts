@@ -41,3 +41,22 @@ export function tableRows($: $, tableSel: string): string[][] {
     });
   return rows;
 }
+
+const BLOCK_TAGS = "p,div,li,tr,h1,h2,h3,h4,h5,h6,ul,ol,table";
+
+/** HTML 조각을 줄바꿈을 보존한 일반 텍스트로 바꾼다 (script/style 제거). `$root`를 고치므로 필요하면 clone을 넘긴다. */
+export function htmlToText($: $, $root: Cheerio<AnyNode>): string {
+  $root.find("script,style").remove();
+  $root.find("br").replaceWith("\n");
+  $root.find(BLOCK_TAGS).each((_, el) => {
+    $(el).append("\n");
+  });
+  return $root
+    .text()
+    .replace(/ /g, " ")
+    .split("\n")
+    .map((l) => l.replace(/[ \t]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
