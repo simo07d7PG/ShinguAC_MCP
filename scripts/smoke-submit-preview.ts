@@ -4,7 +4,6 @@ import { SessionManager } from "../src/auth/session-manager.js";
 import { HttpClient } from "../src/http/http-client.js";
 import { CategoryService } from "../src/service/category-service.js";
 
-
 const [lectureSeq, ...reportSeqs] = process.argv.slice(2);
 if (!lectureSeq || reportSeqs.length === 0) throw new Error("인자: <lectureSeq> <reportSeq>...");
 const client = new HttpClient();

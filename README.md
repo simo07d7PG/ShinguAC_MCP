@@ -106,7 +106,6 @@ Windows에서는 `C:\Users\<사용자>\.shingu-mcp\config.json`입니다.
 | `get_notices` | `category`(`univ`/`scholarship`/`eclass`), `limit`(1~100, 기본 20), `include_eclass`(기본 false) | 공지 목록 (최신순) | 약 0.4초 |
 | `get_notice` | `id`: `get_notices` 결과의 id | 공지 본문, 첨부파일 목록 | 약 0.7초 |
 | `get_grades` | `semester`(선택, `YYYY-H` 예: `2026-1`) | 학기별 성적, 이수구분별 학점, 이번 학기 과목별 성적 | 약 1.5초 |
-
 | `submit_assignment` | `report_seq`·`title`·`content`(필수), `lecture_seq`·`file_path`(절대 경로, 1개)·`confirm_token`(선택) | 토큰 없이 호출하면 미리보기(대상 과제, 마감·연장 감점, 덮어쓰기 경고, 기존 첨부)와 `confirmToken`. 그 토큰을 넣어 다시 호출하면 제출하고, 포털을 다시 읽어 `verified`로 반영 여부를 표시 | 미리보기 약 2초 |
 
 소요 시간은 실계정 실측값이며 네트워크와 수강 과목 수에 따라 달라집니다. `include_eclass`를 켜면 과목당 포털 요청이 2회 늘어납니다.

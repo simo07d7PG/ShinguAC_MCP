@@ -7,7 +7,6 @@ import { registerGetGrades } from "./get-grades.js";
 import { registerGetNotice } from "./get-notice.js";
 import { registerGetNotices } from "./get-notices.js";
 import { registerGetTimetable } from "./get-timetable.js";
-
 import { registerSubmitAssignment } from "./submit-assignment.js";
 
 export type ToolService = Pick<
@@ -19,7 +18,6 @@ export type ToolService = Pick<
   | "getNotices"
   | "getNotice"
   | "getGrades"
-
   | "submitAssignment"
 >;
 
@@ -34,6 +32,5 @@ export function registerAllTools(server: McpServer, getService: GetService): voi
   registerGetNotices(server, getService);
   registerGetNotice(server, getService);
   registerGetGrades(server, getService);
-
   registerSubmitAssignment(server, getService);
 }
