@@ -11,6 +11,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const rawDir = join(root, "tests", "fixtures", "raw");
 const outDir = join(root, "tests", "fixtures");
 const check = process.argv.includes("--check");
+// 포털 첨부 키 형식 `YYYYMMDDHHmmss-<32 hex>`(테스트용 가짜 값 `20260101000000-000…0`은 제외).
+const REAL_FILE_KEY = /((?:fileKey|fileMasterKey|file_key)=|data-file(?:-master)?-key=["']|"(?:fileKey|fileMasterKey)"\s*:\s*")(?!20260101000000-0{32})\d{14}-[0-9a-f]{32}/gi;
 
 // ---- 치환 대상 (실제 값은 .env 와 아래 상수에서만 온다. 이 파일은 커밋되므로 실명·학번을 적지 않는다) ----
 function readEnv() {
@@ -82,6 +84,8 @@ function mask(text) {
   t = t.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "user@example.com");
   // 파일 키·토큰·QR
   t = t.replace(/file_key=[^"'&\s]+/g, "file_key=MASKED");
+  // 첨부 키는 쿠키 없이 파일을 받을 수 있는 값이다(주석 처리된 링크·data 속성에도 남는다).
+  t = t.replace(REAL_FILE_KEY, "$1MASKED");
   t = t.replace(/data:image\/png;base64,[A-Za-z0-9+/=]+/g, "data:image/png;base64,MASKED");
   t = t.replace(/(jsessionid=)[^;"'&\s]+/gi, "$1MASKED");
   // 평점·점수 (구조 유지, 실제 값 아님)
@@ -107,6 +111,7 @@ if (check) {
   for (const f of walk(outDir)) {
     const s = readFileSync(f, "utf8");
     for (const w of FORBIDDEN) if (s.includes(w)) { console.error(`PII 발견: ${f}`); bad++; }
+    if (new RegExp(REAL_FILE_KEY.source, "i").test(s)) { console.error(`실제 첨부 키 발견: ${f}`); bad++; }
   }
   console.log(bad ? `실패: ${bad}건` : "OK: tests/fixtures/ 에 금지 문자열 없음");
   process.exit(bad ? 1 : 0);
