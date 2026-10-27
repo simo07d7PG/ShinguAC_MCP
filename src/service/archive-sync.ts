@@ -6,11 +6,11 @@ import { ConfigError } from "../config/config.js";
 import type { HttpClient } from "../http/http-client.js";
 import { logger as defaultLogger } from "../log/logger.js";
 import { redact } from "../log/redact.js";
-import { effectiveDeadline, parseHomeworkDetail } from "../parsers/assignments.js";
+import { effectiveDeadline, parseHomeworkDetail, type HomeworkRow } from "../parsers/assignments.js";
 import { ParseError, fragmentToText } from "../parsers/common.js";
 import type { EclassLecture } from "../parsers/eclass.js";
 import { parseNoticeId } from "../parsers/notices.js";
-import { parseSubmitControls } from "../parsers/submit.js";
+import { parseSubmitControls, plainOf, type FileDetail, type SubmitForm } from "../parsers/submit.js";
 import { enterLecture, fetchEclassBoardAll, fetchEclassBoardPost, fetchEclassHome, fetchHomeworkList } from "../portal/eclass.js";
 import { currentAcademicTerm } from "../portal/semester.js";
 import { fetchFileInfo, fetchHomeworkDetailHtml, fetchSubmitForm } from "../portal/submit.js";
@@ -78,7 +78,7 @@ const errorSummary = (err: unknown): string =>
 const isFatal = (err: unknown): boolean =>
   err instanceof ConfigError || typeof (err as { userAction?: unknown } | null)?.userAction === "string";
 
-const WIN_RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i;
+const WIN_RESERVED = /^(con|prn|aux|nul|com\d|lpt\d|conin\$|conout\$)(\..*)?$/i;
 
 /** Windows·POSIX 모두에서 안전한 파일/폴더 이름. 경로 구분자·예약 이름·끝 점을 없애고 길이를 줄인다. */
 export function safeName(name: string, maxLen = 120): string {
@@ -88,7 +88,8 @@ export function safeName(name: string, maxLen = 120): string {
   if (s.length > maxLen) {
     const dot = s.lastIndexOf(".");
     const ext = dot > 0 && s.length - dot <= 16 ? s.slice(dot) : "";
-    s = s.slice(0, maxLen - ext.length).trimEnd() + ext;
+    s = s.slice(0, maxLen - ext.length).replace(/[. ]+$/, "") + ext;
+    if (!s || s === ext) s = `file${ext}`;
   }
   return s;
 }
@@ -176,11 +177,18 @@ export class ArchiveSync {
   ): Promise<CourseSyncSummary | null> {
     await enterLecture(this.session, lecture.lectureSeq);
     const homework = await fetchHomeworkList(this.session);
-    const boards = {
+    const lists = {
       notice: await fetchEclassBoardAll(this.session, BOARD_IDS.notice, lecture),
       material: await fetchEclassBoardAll(this.session, BOARD_IDS.material, lecture),
     };
+    const boards = { notice: lists.notice.rows, material: lists.material.rows };
     if (homework.length === 0 && boards.notice.length === 0 && boards.material.length === 0) return null;
+    for (const board of ["notice", "material"] as const) {
+      const { rows, total } = lists[board];
+      if (total > rows.length) {
+        warnings.push(`${lecture.courseName} ${board === "notice" ? "수업공지" : "자료실"}: 목록 ${total}건 중 ${rows.length}건만 읽었습니다.`);
+      }
+    }
 
     this.db.upsertCourse(
       {
@@ -204,9 +212,31 @@ export class ArchiveSync {
     const label = (s: string): string => `${lecture.courseName} ${s}`;
 
     for (const row of homework) {
-      if (!full && !this.needsAssignmentRefresh(row.reportSeq)) continue;
+      if (!full && !this.needsAssignmentRefresh(row)) continue;
       const html = await fetchHomeworkDetailHtml(this.session, row.reportSeq);
       const d = parseHomeworkDetail(html);
+      // 마감이 지나면 상세 화면에 제출 버튼이 모두 사라져 "기간 아님"으로 보이지만, 제출했다면 editModal에 내용이 남아 있다
+      // (실측 2026-10-27: 마감 지난 25건 중 9건). 그런 과제는 제출 폼을 한 번 읽어 판정한다.
+      const deadline = effectiveDeadline(d.extendedDueAt ?? d.dueAt ?? row.extendedDueAt ?? row.dueAt);
+      const ended = d.submitStatus === "not_open" && deadline !== null && this.now().getTime() > Date.parse(deadline);
+      let submission: { form: SubmitForm; files: FileDetail[] } | undefined;
+      if (d.submitStatus === "submitted" || ended) {
+        try {
+          const controls = parseSubmitControls(html);
+          const form = await fetchSubmitForm(this.session, "edit", row.reportSeq, controls.reportNm);
+          const hasContent = form.title.trim() !== "" || plainOf(form.contentHtml) !== "" || form.attach.fileMasterKey !== "";
+          if (d.submitStatus === "submitted" || hasContent) {
+            const files = form.attach.fileMasterKey ? await fetchFileInfo(this.session, form.attach.fileMasterKey) : [];
+            submission = { form, files };
+          }
+        } catch (err) {
+          if (!(err instanceof ParseError)) throw err;
+          if (d.submitStatus === "submitted") {
+            warnings.push(`${label(`과제 ${row.reportSeq}`)}: 제출 내용을 읽지 못했습니다(${errorSummary(err)})`);
+          }
+        }
+      }
+      const submitStatus = submission ? "submitted" : d.submitStatus;
       const fetchedAt = nowKst(this.now());
       const res = this.db.transaction(() => {
         const r = this.db.upsertAssignment(
@@ -220,7 +250,7 @@ export class ArchiveSync {
             penaltyNote: d.penaltyNote ?? null,
             contentHtml: d.bodyHtml,
             contentText: fragmentToText(d.bodyHtml),
-            submitStatus: d.submitStatus,
+            submitStatus,
           },
           fetchedAt,
         );
@@ -229,33 +259,26 @@ export class ArchiveSync {
       });
       if (res !== "same") summary.assignments[res]++;
 
-      if (d.submitStatus !== "submitted") continue;
-      try {
-        const controls = parseSubmitControls(html);
-        const form = await fetchSubmitForm(this.session, "edit", row.reportSeq, controls.reportNm);
-        const files = form.attach.fileMasterKey ? await fetchFileInfo(this.session, form.attach.fileMasterKey) : [];
-        const attachments = files
-          .map((f) => ({ key: String(f["fileKey"] ?? ""), name: String(f["oriFileNm"] ?? f["fileKey"] ?? "") }))
-          .filter((f) => f.key)
-          .map((f) => ({ name: f.name, url: `${PORTAL_ORIGIN}/file/download?fileKey=${encodeURIComponent(f.key)}` }));
-        const sub = this.db.transaction(() => {
-          const r = this.db.upsertSubmission(
-            {
-              reportSeq: row.reportSeq,
-              title: form.title,
-              contentHtml: form.contentHtml,
-              contentText: fragmentToText(form.contentHtml),
-            },
-            nowKst(this.now()),
-          );
-          this.db.replaceAttachments("submission", row.reportSeq, lecture.lectureSeq, attachments);
-          return r;
-        });
-        if (sub !== "same") summary.submissions[sub]++;
-      } catch (err) {
-        if (!(err instanceof ParseError)) throw err;
-        warnings.push(`${label(`과제 ${row.reportSeq}`)}: 제출 내용을 읽지 못했습니다(${errorSummary(err)})`);
-      }
+      if (!submission) continue;
+      const { form, files } = submission;
+      const attachments = files
+        .map((f) => ({ key: String(f["fileKey"] ?? ""), name: String(f["oriFileNm"] ?? f["fileKey"] ?? "") }))
+        .filter((f) => f.key)
+        .map((f) => ({ name: f.name, url: `${PORTAL_ORIGIN}/file/download?fileKey=${encodeURIComponent(f.key)}` }));
+      const sub = this.db.transaction(() => {
+        const r = this.db.upsertSubmission(
+          {
+            reportSeq: row.reportSeq,
+            title: form.title,
+            contentHtml: form.contentHtml,
+            contentText: fragmentToText(form.contentHtml),
+          },
+          nowKst(this.now()),
+        );
+        this.db.replaceAttachments("submission", row.reportSeq, lecture.lectureSeq, attachments);
+        return r;
+      });
+      if (sub !== "same") summary.submissions[sub]++;
     }
 
     for (const board of ["notice", "material"] as const satisfies readonly Board[]) {
@@ -290,15 +313,19 @@ export class ArchiveSync {
   }
 
   /**
-   * 증분 동기화에서 과제 상세를 다시 읽을지. 처음 보는 과제, 마감(연장 포함)이 없거나 하루 이상 지나지 않은 과제,
-   * 제출했는데 제출 내용이 아직 없는 과제만 읽는다. 마감이 지난 과제는 더 바뀌지 않는다고 본다.
+   * 증분 동기화에서 과제 상세를 다시 읽을지. 처음 보는 과제, 제출했는데 제출 내용이 아직 없는 과제,
+   * 마감(연장 포함)이 없거나 하루 이상 지나지 않은 과제만 읽는다. 마감은 저장값과 방금 받은 목록 값을 모두 본다
+   * (마감 뒤에 연장기한이 생기면 목록에만 먼저 보인다). 마감이 지난 과제는 더 바뀌지 않는다고 본다.
    */
-  private needsAssignmentRefresh(reportSeq: string): boolean {
-    const state = this.db.getAssignmentState(reportSeq);
+  private needsAssignmentRefresh(row: HomeworkRow): boolean {
+    const state = this.db.getAssignmentState(row.reportSeq);
     if (!state) return true;
-    if (state.submitStatus === "submitted" && !this.db.hasSubmission(reportSeq)) return true;
-    const deadline = effectiveDeadline(state.extendedDueAt ?? state.dueAt);
-    return deadline === null || this.now().getTime() <= Date.parse(deadline) + DAY_MS;
+    if (state.submitStatus === "submitted" && !this.db.hasSubmission(row.reportSeq)) return true;
+    const open = (iso: string | null): boolean => {
+      const deadline = effectiveDeadline(iso);
+      return deadline === null || this.now().getTime() <= Date.parse(deadline) + DAY_MS;
+    };
+    return open(state.extendedDueAt ?? state.dueAt) || open(row.extendedDueAt ?? row.dueAt);
   }
 
   /** DB에서 아직 받지 않은 첨부를 차례로 내려받는다. 실패한 것은 다음 동기화에서 다시 시도한다. */

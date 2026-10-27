@@ -2,12 +2,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as cheerio from "cheerio";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthRejectedError } from "../../src/auth/errors.js";
 import { SessionManager } from "../../src/auth/session-manager.js";
 import type { Config } from "../../src/config/config.js";
 import { Secret } from "../../src/config/secret.js";
 import { HttpClient } from "../../src/http/http-client.js";
+import { effectiveDeadline, parseHomeworkList } from "../../src/parsers/assignments.js";
 import { RequestQueue } from "../../src/queue/request-queue.js";
 import { safeName } from "../../src/service/archive-sync.js";
 import { CategoryService } from "../../src/service/category-service.js";
@@ -36,6 +38,11 @@ let current: string | undefined;
 let login: ReturnType<typeof vi.fn>;
 /** 게시글 본문을 바꿔 다시 받는지 확인하는 데 쓴다. */
 let materialDetail: string;
+/** 목록의 마감·연장기한을 바꿔 증분 판정을 확인하는 데 쓴다. */
+let homeworkList: string;
+/** 지정하면 모든 과제 상세를 이 화면으로, 제출 폼을 editModal로 돌려준다. */
+let detailOverride: string | undefined;
+let editModal: string;
 
 function route(r: Recorded): Response {
   const page = r.query.get("pageIndex") ?? "1";
@@ -45,8 +52,9 @@ function route(r: Recorded): Response {
     case "POST /eclass/clas/home":
       return html(fixture("eclass/clas-home.html"));
     case "GET /eclass/clas/room/homework/homeworkList":
-      return html(current === "27962" ? fixture("eclass/homework-list.html") : EMPTY_HOMEWORK);
+      return html(current === "27962" ? homeworkList : EMPTY_HOMEWORK);
     case "GET /eclass/clas/room/homework/homeworkDetail":
+      if (detailOverride) return html(detailOverride);
       return html(
         fixture(
           r.query.get("reportSeq") === "34757"
@@ -55,7 +63,7 @@ function route(r: Recorded): Response {
         ),
       );
     case "GET /eclass/clas/room/homework/editModal":
-      return html(fixture("eclass/homework-edit-modal.html"));
+      return html(editModal);
     case "GET /file/info":
       return new Response(FILE_INFO, { status: 200, headers: { "content-type": "text/plain;charset=UTF-8" } });
     case "GET /eclass/clas/board/list": {
@@ -75,7 +83,7 @@ function route(r: Recorded): Response {
   }
 }
 
-function makeService(): CategoryService {
+function makeService(now: Date = NOW): CategoryService {
   const fetchMock = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input));
     const method = init?.method ?? "GET";
@@ -100,7 +108,7 @@ function makeService(): CategoryService {
     session,
     client,
     archive: { db, dbPath: join(root, "eclass.db"), filesDir: join(root, "files") },
-    now: () => NOW,
+    now: () => now,
     logger,
   });
 }
@@ -114,7 +122,21 @@ beforeEach(async () => {
   current = undefined;
   login = vi.fn(async () => {});
   materialDetail = fixture("eclass/board-detail-material-attach.html");
+  homeworkList = fixture("eclass/homework-list.html");
+  detailOverride = undefined;
+  editModal = fixture("eclass/homework-edit-modal.html");
 });
+
+const DAY = 24 * 60 * 60 * 1000;
+/** 목록 행 기준으로 아직 열려 있는(마감 없음 또는 마감+1일 전) 과제. */
+const openInList = (): string[] =>
+  parseHomeworkList(homeworkList)
+    .filter((r) => {
+      const d = effectiveDeadline(r.extendedDueAt ?? r.dueAt);
+      return d === null || NOW.getTime() <= Date.parse(d) + DAY;
+    })
+    .map((r) => r.reportSeq);
+const PAST = "UPDATE assignments SET due_at = '2026-09-01T23:59:00+09:00', extended_due_at = NULL";
 afterEach(async () => {
   db.close();
   await rm(root, { recursive: true, force: true });
@@ -178,19 +200,58 @@ describe("ArchiveSync (sync_eclass)", () => {
   it("두 번째 동기화(증분): 저장된 게시글과 마감 지난 과제는 다시 읽지 않는다", async () => {
     const service = makeService();
     await service.syncArchive();
-    // 픽스처 상세는 모두 같은 마감이므로, 34771·34757만 남기고 마감이 지난 과제로 바꿔 둔다.
-    db.all("UPDATE assignments SET due_at = '2026-09-01T23:59:00+09:00', extended_due_at = NULL WHERE report_seq NOT IN ('34771', '34757')");
+    // 픽스처 상세는 모두 같은 마감이므로, 34771·34757만 남기고 저장값을 마감 지난 과제로 바꿔 둔다.
+    db.all(`${PAST} WHERE report_seq NOT IN ('34771', '34757')`);
     requests = [];
 
     const res = await service.syncArchive();
     expect(count("/eclass/clas/board/detail")).toBe(0);
-    expect(
-      requests.filter((r) => r.path === "/eclass/clas/room/homework/homeworkDetail").map((r) => r.query.get("reportSeq")).sort(),
-    ).toEqual(["34757", "34771"]);
+    const reread = requests.filter((r) => r.path === "/eclass/clas/room/homework/homeworkDetail").map((r) => r.query.get("reportSeq"));
+    // 저장값이 열린 2건 + 목록 값이 아직 열린 과제
+    expect(new Set(reread)).toEqual(new Set(["34757", "34771", ...openInList()]));
+    expect(reread.length).toBeLessThan(30);
     expect(count("/01shingu/eClassDown.jsp") + count("/file/download")).toBe(0);
     const ui = res.courses.find((c) => c.lectureSeq === "27962")!;
     expect(ui.assignments.new).toBe(0);
     expect(ui.materials.new).toBe(0);
+  });
+
+  it("마감이 지난 뒤 목록에 연장기한이 생기면 상세를 다시 읽는다", async () => {
+    const service = makeService();
+    await service.syncArchive({ downloadFiles: false });
+    db.all(PAST);
+    const $ = cheerio.load(homeworkList);
+    $("tr[data-wr-id=34408] td").eq(2).find("span[data-role=date]").text("2026-10-30 00:00:00.0");
+    homeworkList = $.html();
+    requests = [];
+    await service.syncArchive({ downloadFiles: false });
+    const reread = requests.filter((r) => r.path === "/eclass/clas/room/homework/homeworkDetail").map((r) => r.query.get("reportSeq"));
+    expect(reread).toContain("34408");
+    expect(new Set(reread)).toEqual(new Set(openInList()));
+  });
+
+  it("마감 지나 버튼이 없는 과제는 제출 폼으로 판정: 내용이 있으면 제출로 저장, 없으면 제출 아님", async () => {
+    // 모든 마감이 지난 시점, 상세는 버튼 없는 화면(기간 아님)
+    const later = new Date("2027-02-20T12:00:00+09:00");
+    detailOverride = fixture("eclass/homework-detail-not-open.html");
+    const res = await makeService(later).syncArchive({ downloadFiles: false });
+    const ui = res.courses.find((c) => c.lectureSeq === "27962")!;
+    expect(count("/eclass/clas/room/homework/editModal")).toBe(30);
+    expect(ui.submissions.new).toBe(30);
+    expect(db.all("SELECT DISTINCT submit_status s FROM assignments")).toEqual([{ s: "submitted" }]);
+
+    // 제출 폼이 비어 있으면(내지 않은 과제) 제출로 보지 않고 첨부 목록도 읽지 않는다
+    db.close();
+    db = new ArchiveDb(join(root, "eclass2.db"));
+    requests = [];
+    editModal = fixture("eclass/homework-edit-modal.html")
+      .replace(/(name="reportTitle"[^>]*value=')[^']*'/, "$1'")
+      .replace(/(<textarea[^>]*name="reportContent"[^>]*>)[\s\S]*?(<\/textarea>)/, "$1$2")
+      .replace(/data-file-master-key="[^"]*"/, 'data-file-master-key=""');
+    const none = await makeService(later).syncArchive({ downloadFiles: false });
+    expect(none.courses.find((c) => c.lectureSeq === "27962")!.submissions.new).toBe(0);
+    expect(count("/file/info")).toBe(0);
+    expect(db.all("SELECT DISTINCT submit_status s FROM assignments")).toEqual([{ s: "not_open" }]);
   });
 
   it("full: 게시글을 다시 읽어 바뀐 본문을 갱신한다", async () => {
@@ -245,5 +306,8 @@ describe("safeName", () => {
     const long = safeName(`${"가".repeat(200)}.pptx`);
     expect(long.length).toBe(120);
     expect(long.endsWith(".pptx")).toBe(true);
+    // 자른 자리가 점·공백이면 다시 지운다(확장자 없는 긴 이름)
+    expect(safeName(`${"a".repeat(119)}. bcdefghijklmnopqrstu`)).not.toMatch(/[. ]$/);
+    expect(safeName("CONOUT$")).toBe("_CONOUT$");
   });
 });

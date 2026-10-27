@@ -12,7 +12,7 @@ const PATTERNS: Array<[RegExp, string]> = [
   [/\b(jsessionid)(\s*=\s*)[^;&\s"',]*/gi, `$1$2${MASK}`],
   [/\b(access_token|refresh_token)(\s*[=:]\s*)[^&\s"',;}]*/gi, `$1$2${MASK}`],
   // 첨부 키는 쿠키 없이 파일을 받을 수 있는 값이다(docs/portal-pages.md §3.4).
-  [/\b(file_key|fileKey|fileMasterKey)(\s*=\s*)[^&\s"',;}]*/g, `$1$2${MASK}`],
+  [/\b(file[_-]?key|file[_-]?master[_-]?key)("?\s*[=:]\s*"?)[^&\s"',;}]*/gi, `$1$2${MASK}`],
 ];
 
 export function redact(text: string, secrets: string[] = []): string {

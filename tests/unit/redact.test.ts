@@ -30,6 +30,8 @@ describe("redact", () => {
     expect(out).not.toMatch(/20261020-abc|k1|m2/);
     expect(out).toContain("file_key=***");
     expect(out).toContain("&x=1");
+    const json = redact('{"fileKey":"20261020-k3","FILE_KEY=K4", data-file-key="20261020-k5"}');
+    expect(json).not.toMatch(/k3|K4|k5/);
   });
 
   it("jsessionid / access_token / refresh_token을 마스킹한다", () => {

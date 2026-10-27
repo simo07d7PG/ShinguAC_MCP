@@ -72,6 +72,8 @@ describe("ArchiveDb", () => {
     expect(db.findDownloadedBySha("s1")).toBe("c/a.pdf");
     expect(db.isPathTaken("c/a.pdf", second!.id)).toBe(true);
     expect(db.isPathTaken("c/a.pdf", first!.id)).toBe(false);
+    // Windows·macOS에서는 대소문자·정규화만 다른 이름도 같은 파일
+    expect(db.isPathTaken("C/A.PDF", second!.id)).toBe(true);
 
     // a는 그대로, 두 번째 자리는 c로 바뀜 → a 기록 유지, c는 미다운로드
     const c = { name: "c.pdf", url: "https://cec.shingu.ac.kr/x?file_key=c" };
@@ -91,7 +93,9 @@ describe("ArchiveDb", () => {
       const again = new ArchiveDb(path);
       expect(again.all("PRAGMA user_version")).toEqual([{ user_version: 1 }]);
       expect(again.all("SELECT course_name FROM courses")).toEqual([{ course_name: "자료구조" }]);
+      again.all("PRAGMA user_version = 99");
       again.close();
+      expect(() => new ArchiveDb(path)).toThrow(/v99.*업데이트/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

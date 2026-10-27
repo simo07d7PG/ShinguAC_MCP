@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { rename, rm } from "node:fs/promises";
 import { Readable, Transform } from "node:stream";
@@ -102,7 +102,7 @@ export class HttpClient {
    */
   async download(startUrl: string, dest: string, options: RequestOptions = {}): Promise<DownloadResult> {
     const queueOptions: EnqueueOptions = { ...options, timeoutMs: options.timeoutMs ?? DOWNLOAD_TIMEOUT_MS };
-    const tmp = `${dest}.part`;
+    const tmps: string[] = [];
     let url = this.assertAllowed(startUrl);
     try {
       for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -125,6 +125,15 @@ export class HttpClient {
               await res.body?.cancel();
               throw new HttpStatusError(res.status, url);
             }
+            const type = res.headers.get("content-type") ?? "";
+            if (/^text\/html/i.test(type) && !res.headers.get("content-disposition")) {
+              // 만료·삭제된 키나 로그인 화면이 200 HTML로 올 수 있다. 파일로 저장하지 않는다.
+              await res.body?.cancel();
+              throw new NetworkError(`파일 대신 HTML 화면을 받았습니다: ${url}`);
+            }
+            // 시도(재시도 포함)마다 다른 임시 파일: 중단된 이전 스트림과 겹치지 않게 한다.
+            const tmp = `${dest}.${process.pid}.${randomBytes(4).toString("hex")}.part`;
+            tmps.push(tmp);
             const hash = createHash("sha256");
             let size = 0;
             const meter = new Transform({
@@ -137,25 +146,30 @@ export class HttpClient {
             const body = res.body ? Readable.fromWeb(res.body as WebReadableStream) : Readable.from([]);
             await pipeline(body, meter, createWriteStream(tmp));
             const expected = res.headers.get("content-length");
-            if (expected !== null && Number(expected) !== size) {
+            // 압축 응답이면 Content-Length는 압축된 크기라 비교하지 않는다.
+            if (expected !== null && !res.headers.get("content-encoding") && Number(expected) !== size) {
               throw new NetworkError(`다운로드 크기 불일치(${size}/${expected}바이트): ${url}`);
             }
-            return { result: { size, sha256: hash.digest("hex"), headers: res.headers } };
+            return { result: { size, sha256: hash.digest("hex"), headers: res.headers, tmp } };
           } catch (err) {
             if (err instanceof HttpStatusError || err instanceof NetworkError) throw err;
             throw new NetworkError(`다운로드 실패: ${url}`, { cause: err });
           }
         }, queueOptions);
         if (out.result) {
+          const { tmp, ...result } = out.result;
           await rename(tmp, dest);
-          return out.result;
+          tmps.splice(tmps.indexOf(tmp), 1);
+          await Promise.all(tmps.map((t) => rm(t, { force: true }).catch(() => {})));
+          return result;
         }
         url = this.assertAllowed(new URL(out.location!, url).href);
         this.logger?.debug("redirect", url);
       }
       throw new NetworkError(`리다이렉트가 ${MAX_REDIRECTS}회를 초과했습니다: ${startUrl}`);
     } catch (err) {
-      await rm(tmp, { force: true });
+      // 정리 실패(Windows EBUSY 등)가 원래 오류를 가리지 않게 한다.
+      await Promise.all(tmps.map((t) => rm(t, { force: true }).catch(() => {})));
       throw err;
     }
   }

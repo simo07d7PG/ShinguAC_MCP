@@ -94,6 +94,7 @@
    - 본문: **첨부가 있으면 제목 패널과 본문 패널 사이에 첨부 패널이 하나 더 생긴다**(패널 3개, 본문은 세 번째). 첨부 링크 `a[href^="https://cec.shingu.ac.kr/01shingu/eClassDown.jsp?file_key="]`, 이름은 `span.pl5`. 픽스처 `eclass/board-detail-material-attach.html`(첨부 3건).
 7. **첨부 다운로드** (실측 2026-10-27):
    - 게시판·과제 첨부 `cec.shingu.ac.kr/01shingu/eClassDown.jsp?file_key=` → 200 `application/octet-stream`, `Content-Disposition: attachment;filename*=utf-8''<퍼센트 인코딩>`, `Content-Length` 있음. **쿠키 없이도 받아진다**(file_key가 곧 접근 권한 — 노출 주의). 56MB 파일 21초(일반 요청 타임아웃 15초로는 부족).
+   - **마감이 지난 과제는 제출했어도 상세 화면에 버튼이 없다**(→ 파서상 `not_open`). 실측 2026-10-27 UI화면설계: 마감 지난 25건 중 9건은 `editModal`에 제목·본문·첨부 키가 그대로 있었고(=제출함), 16건은 모두 비어 있었다. 아카이브는 마감 지난 `not_open` 과제를 `editModal`로 다시 판정한다. (`get_assignments`/`get_assignment`는 여전히 버튼 기준이라 이런 과제를 `not_open`으로 보인다.)
    - 내가 제출한 첨부: `editModal`의 `data-file-master-key` → `GET /file/info?fileMasterKey=` → `fileDetails[].{fileKey, oriFileNm, fileSize, fileContentType}` → `GET /file/download?fileKey=<fileKey>`(리다이렉트 1회 후 200). **이것도 쿠키 없이 받아진다.** `Content-Disposition` 파일명은 인코딩이 깨져 있으므로 `oriFileNm`을 쓴다.
 
 ### 3.5 성적·학점

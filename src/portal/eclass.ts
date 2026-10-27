@@ -61,21 +61,27 @@ export async function fetchEclassBoardList(
 /** 안전장치: 게시판 하나에서 따라갈 최대 페이지 수(페이지당 10건). */
 const MAX_BOARD_PAGES = 50;
 
-/** 게시판 목록 전체 페이지 — 페이지 수만큼 요청(페이지당 10건). `enterLecture` 뒤에 호출한다. */
+/**
+ * 게시판 목록 전체 페이지 — 페이지 수만큼 요청(페이지당 10건). `enterLecture` 뒤에 호출한다.
+ * `total`은 첫 페이지의 `Total N`(모은 건수와 다르면 일부만 읽은 것).
+ */
 export async function fetchEclassBoardAll(
   session: SessionManager,
   boardId: string,
   lecture: Pick<EclassLecture, "lectureSeq" | "courseName">,
-): Promise<NoticeSummary[]> {
-  const all: NoticeSummary[] = [];
+): Promise<{ rows: NoticeSummary[]; total: number }> {
+  const rows: NoticeSummary[] = [];
+  let total = 0;
   for (let page = 1; page <= MAX_BOARD_PAGES; page++) {
     const q = new URLSearchParams({ boardId, pageIndex: String(page) });
     const res = await session.request((c) => c.get(`${CLAS}/board/list?${q}`));
-    const rows = parseEclassBoardList(res.text, { lectureSeq: lecture.lectureSeq, boardId, courseName: lecture.courseName });
-    all.push(...rows);
-    if (rows.length === 0 || page >= parseBoardPaging(res.text).pages) break;
+    const pageRows = parseEclassBoardList(res.text, { lectureSeq: lecture.lectureSeq, boardId, courseName: lecture.courseName });
+    const paging = parseBoardPaging(res.text);
+    if (page === 1) total = paging.total;
+    rows.push(...pageRows);
+    if (pageRows.length === 0 || page >= paging.pages) break;
   }
-  return all;
+  return { rows, total };
 }
 
 /** 게시글 원문(본문 HTML·작성자 포함) — 1요청. `enterLecture` 뒤에 호출한다. */

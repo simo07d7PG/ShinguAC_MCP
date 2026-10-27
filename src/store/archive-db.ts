@@ -138,8 +138,14 @@ export class ArchiveDb {
   constructor(path: string) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
-    this.db.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
-    this.migrate();
+    try {
+      this.db.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
+      this.migrate();
+    } catch (err) {
+      // 열다 실패하면 파일 잠금이 남지 않게 닫는다.
+      this.db.close();
+      throw err;
+    }
   }
 
   close(): void {
@@ -148,6 +154,9 @@ export class ArchiveDb {
 
   private migrate(): void {
     const { user_version: version } = this.db.prepare("PRAGMA user_version").get() as { user_version: number };
+    if (version > MIGRATIONS.length) {
+      throw new Error(`아카이브 DB 스키마(v${version})가 이 버전(v${MIGRATIONS.length})보다 새롭습니다. shingu-mcp를 업데이트하세요.`);
+    }
     for (let v = version; v < MIGRATIONS.length; v++) {
       this.transaction(() => {
         this.db.exec(MIGRATIONS[v]!);
@@ -157,7 +166,8 @@ export class ArchiveDb {
   }
 
   transaction<T>(fn: () => T): T {
-    this.db.exec("BEGIN");
+    // 다른 프로세스와 겹칠 때 읽기→쓰기 승격에서 바로 SQLITE_BUSY가 나지 않도록 처음부터 쓰기 잠금을 잡는다.
+    this.db.exec("BEGIN IMMEDIATE");
     try {
       const out = fn();
       this.db.exec("COMMIT");
@@ -352,11 +362,13 @@ export class ArchiveDb {
     return row?.local_path;
   }
 
-  /** 다른 첨부가 이미 이 로컬 경로를 쓰고 있는가. */
+  /** 다른 첨부가 이미 이 로컬 경로를 쓰고 있는가. Windows·macOS 파일시스템처럼 대소문자·유니코드 정규화를 무시한다. */
   isPathTaken(localPath: string, exceptId: number): boolean {
-    return (
-      this.db.prepare("SELECT 1 FROM attachments WHERE local_path = ? AND id <> ?").get(localPath, exceptId) !== undefined
-    );
+    const key = localPath.normalize("NFC").toLowerCase();
+    const rows = this.db
+      .prepare("SELECT local_path FROM attachments WHERE local_path IS NOT NULL AND id <> ?")
+      .all(exceptId) as { local_path: string }[];
+    return rows.some((r) => r.local_path.normalize("NFC").toLowerCase() === key);
   }
 
   markDownloaded(id: number, info: { localPath: string; size: number; sha256: string; downloadedAt: string }): void {

@@ -102,9 +102,15 @@ export function parseHomeworkDetail(html: string): HomeworkDetail {
   cell("첨부파일")
     .find("a[href]")
     .each((_, a) => {
-      const url = ($(a).attr("href") ?? "").trim();
+      const href = ($(a).attr("href") ?? "").trim();
       const name = text($(a).find("span")) || text($(a));
-      if (url) attachments.push({ name, url });
+      let url: URL;
+      try {
+        url = new URL(href, "https://student.shingu.ac.kr");
+      } catch {
+        return;
+      }
+      if (href && (url.protocol === "https:" || url.protocol === "http:")) attachments.push({ name, url: url.toString() });
     });
 
   const resubmit = $("button[data-role=resubmitBtn]").first();
