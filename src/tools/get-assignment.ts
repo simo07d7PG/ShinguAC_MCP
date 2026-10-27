@@ -16,7 +16,7 @@ export function registerGetAssignment(server: McpServer, getService: GetService)
         SOURCE_NOTE,
       inputSchema: {
         report_seq: z.string().min(1).describe("get_assignments 결과의 reportSeq."),
-        lecture_seq: z.string().min(1).optional().describe("get_assignments 결과의 lectureSeq. 생략 시 스냅샷에서 찾음."),
+        lecture_seq: z.string().min(1).optional().describe("get_assignments 결과의 lectureSeq. 생략 시 이번 실행의 마지막 get_assignments 결과에서 찾음."),
       },
       outputSchema: withMeta(AssignmentDetailSchema),
     },

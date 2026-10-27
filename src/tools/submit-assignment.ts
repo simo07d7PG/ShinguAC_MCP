@@ -20,7 +20,7 @@ export function registerSubmitAssignment(server: McpServer, getService: GetServi
         SOURCE_NOTE,
       inputSchema: {
         report_seq: z.string().min(1).describe("get_assignments 결과의 reportSeq."),
-        lecture_seq: z.string().min(1).optional().describe("get_assignments 결과의 lectureSeq. 생략 시 스냅샷에서 찾음."),
+        lecture_seq: z.string().min(1).optional().describe("get_assignments 결과의 lectureSeq. 생략 시 이번 실행의 마지막 get_assignments 결과에서 찾음."),
         title: z.string().min(1).max(200).describe("과제 제목(포털 필수 항목). 예: '학번 이름_8주차'."),
         content: z.string().min(1).max(20000).describe("과제 내용(평문, 포털 필수 항목)."),
         file_path: z.string().min(1).optional().describe("첨부할 로컬 파일의 절대 경로(최대 1개). 다시 제출 시 기존 첨부를 교체."),
