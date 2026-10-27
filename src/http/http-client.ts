@@ -6,7 +6,7 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { PortalCookieJar } from "./cookie-jar.js";
 import { decodeBody } from "./decode.js";
-import { AbortError, HostNotAllowedError, HttpStatusError, NetworkError } from "./errors.js";
+import { AbortError, HostNotAllowedError, HttpStatusError, NetworkError, urlForMessage } from "./errors.js";
 import { downloadRequestQueue, requestQueue, type EnqueueOptions, type RequestQueue } from "../queue/request-queue.js";
 
 /** cec.shingu.ac.kr: E클래스 첨부 다운로드(`eClassDown.jsp`). */
@@ -16,6 +16,9 @@ const USER_AGENT =
 const MAX_REDIRECTS = 10;
 /** 첨부 다운로드 한 건의 제한 시간. 실측 56MB가 21초(docs/portal-pages.md §3.4). */
 export const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+const TEMP_SUFFIX = ".part";
+/** download()가 만드는 임시 파일 이름(`<대상>.<pid>.<8 hex>.part`). 이름이 `.part`로 끝나는 정상 첨부와 구분한다. */
+export const DOWNLOAD_TEMP_RE = /\.\d+\.[0-9a-f]{8}\.part$/;
 
 export interface HttpClientOptions {
   fetch?: typeof fetch;
@@ -134,10 +137,10 @@ export class HttpClient {
             if (/^text\/html/i.test(type) && !res.headers.get("content-disposition")) {
               // 만료·삭제된 키나 로그인 화면이 200 HTML로 올 수 있다. 파일로 저장하지 않는다.
               await res.body?.cancel();
-              throw new NetworkError(`파일 대신 HTML 화면을 받았습니다: ${url}`);
+              throw new NetworkError(`파일 대신 HTML 화면을 받았습니다: ${urlForMessage(url)}`);
             }
             // 시도(재시도 포함)마다 다른 임시 파일: 중단된 이전 스트림과 겹치지 않게 한다.
-            const tmp = `${dest}.${process.pid}.${randomBytes(4).toString("hex")}.part`;
+            const tmp = `${dest}.${process.pid}.${randomBytes(4).toString("hex")}${TEMP_SUFFIX}`;
             tmps.push(tmp);
             const hash = createHash("sha256");
             let size = 0;
@@ -153,13 +156,13 @@ export class HttpClient {
             const expected = res.headers.get("content-length");
             // 압축 응답이면 Content-Length는 압축된 크기라 비교하지 않는다.
             if (expected !== null && !res.headers.get("content-encoding") && Number(expected) !== size) {
-              throw new NetworkError(`다운로드 크기 불일치(${size}/${expected}바이트): ${url}`);
+              throw new NetworkError(`다운로드 크기 불일치(${size}/${expected}바이트): ${urlForMessage(url)}`);
             }
             return { result: { size, sha256: hash.digest("hex"), headers: res.headers, tmp } };
           } catch (err) {
             if (options.signal?.aborted) throw new AbortError();
             if (err instanceof HttpStatusError || err instanceof NetworkError) throw err;
-            throw new NetworkError(`다운로드 실패: ${url}`, { cause: err });
+            throw new NetworkError(`다운로드 실패: ${urlForMessage(url)}`, { cause: err });
           }
         }, queueOptions);
         if (out.result) {
@@ -172,7 +175,7 @@ export class HttpClient {
         url = this.assertAllowed(new URL(out.location!, url).href);
         this.logger?.debug("redirect", url);
       }
-      throw new NetworkError(`리다이렉트가 ${MAX_REDIRECTS}회를 초과했습니다: ${startUrl}`);
+      throw new NetworkError(`리다이렉트가 ${MAX_REDIRECTS}회를 초과했습니다: ${urlForMessage(startUrl)}`);
     } catch (err) {
       // 정리 실패(Windows EBUSY 등)가 원래 오류를 가리지 않게 한다.
       await Promise.all(tmps.map((t) => rm(t, { force: true }).catch(() => {})));
@@ -233,7 +236,7 @@ export class HttpClient {
       }
       url = next;
     }
-    throw new NetworkError(`리다이렉트가 ${MAX_REDIRECTS}회를 초과했습니다: ${startUrl}`);
+    throw new NetworkError(`리다이렉트가 ${MAX_REDIRECTS}회를 초과했습니다: ${urlForMessage(startUrl)}`);
   }
 
   private sendOnce(
@@ -257,7 +260,7 @@ export class HttpClient {
         await this.jar.storeFromResponse(url, res.headers.getSetCookie());
         buf = await res.arrayBuffer();
       } catch (err) {
-        throw new NetworkError(`요청 실패: ${url}`, { cause: err });
+        throw new NetworkError(`요청 실패: ${urlForMessage(url)}`, { cause: err });
       }
       if (res.status >= 400) throw new HttpStatusError(res.status, url);
       return { status: res.status, headers: res.headers, body: buf };

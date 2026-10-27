@@ -402,14 +402,16 @@ describe("ArchiveSync 취소·진행률(R6)", () => {
     expect(last).toMatchObject({ progress: 4 + atts, total: 4 + atts });
   });
 
-  it("시작할 때 이전에 남은 *.part 파일을 지운다", async () => {
+  it("시작할 때 이전 다운로드가 남긴 임시 파일만 지운다(이름이 .part로 끝나는 정상 첨부는 유지)", async () => {
     const dir = join(root, "files", "27962_UI화면설계", "materials", "1");
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, "a.pdf.123.abcd.part"), "x");
+    await writeFile(join(dir, "a.pdf.123.0a1b2c3d.part"), "x");
     await writeFile(join(dir, "keep.pdf"), "y");
+    await writeFile(join(dir, "data.part"), "z");
     await makeService().syncArchive({ downloadFiles: false });
-    expect(existsSync(join(dir, "a.pdf.123.abcd.part"))).toBe(false);
+    expect(existsSync(join(dir, "a.pdf.123.0a1b2c3d.part"))).toBe(false);
     expect(existsSync(join(dir, "keep.pdf"))).toBe(true);
+    expect(existsSync(join(dir, "data.part"))).toBe(true);
   });
 });
 

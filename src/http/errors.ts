@@ -12,19 +12,32 @@ export class TimeoutError extends Error {
   }
 }
 
+/**
+ * 오류 메시지용 URL: 쿼리스트링을 뺀 origin + 경로. 첨부 키(`file_key` 등)는 쿠키 없이 파일을 받을 수 있는 값이라
+ * 메시지·로그·DB에 남기지 않는다(원본은 오류 객체의 `url` 속성에만 둔다).
+ */
+export function urlForMessage(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.origin}${u.pathname}`;
+  } catch {
+    return "(잘못된 URL)";
+  }
+}
+
 export class HttpStatusError extends Error {
   constructor(
     public readonly status: number,
     public readonly url: string,
   ) {
-    super(`HTTP ${status}: ${url}`);
+    super(`HTTP ${status}: ${urlForMessage(url)}`);
     this.name = "HttpStatusError";
   }
 }
 
 export class HostNotAllowedError extends Error {
   constructor(public readonly url: string) {
-    super(`허용되지 않은 호스트입니다: ${url}`);
+    super(`허용되지 않은 호스트입니다: ${urlForMessage(url)}`);
     this.name = "HostNotAllowedError";
   }
 }

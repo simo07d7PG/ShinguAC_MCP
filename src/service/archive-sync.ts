@@ -4,7 +4,7 @@ import { dirname, join, posix, resolve, sep } from "node:path";
 import type { SessionManager } from "../auth/session-manager.js";
 import { ConfigError } from "../config/config.js";
 import { AbortError } from "../http/errors.js";
-import type { HttpClient } from "../http/http-client.js";
+import { DOWNLOAD_TEMP_RE, type HttpClient } from "../http/http-client.js";
 import { logger as defaultLogger } from "../log/logger.js";
 import { redact } from "../log/redact.js";
 import { effectiveDeadline, needsSubmitProbe, parseHomeworkDetail, type HomeworkRow } from "../parsers/assignments.js";
@@ -229,7 +229,7 @@ export class ArchiveSync {
     });
   }
 
-  /** 이전 동기화가 중단되며 남긴 임시 파일(`*.part`)을 지운다. 실패는 무시한다(다음 동기화에서 다시 시도). */
+  /** 이전 동기화가 중단되며 남긴 다운로드 임시 파일을 지운다. 실패는 무시한다(다음 동기화에서 다시 시도). */
   private async removePartFiles(): Promise<void> {
     let entries: string[];
     try {
@@ -238,7 +238,7 @@ export class ArchiveSync {
       return;
     }
     await Promise.all(
-      entries.filter((f) => f.endsWith(".part")).map((f) => rm(join(this.filesDir, f), { force: true }).catch(() => {})),
+      entries.filter((f) => DOWNLOAD_TEMP_RE.test(f)).map((f) => rm(join(this.filesDir, f), { force: true }).catch(() => {})),
     );
   }
 
@@ -429,7 +429,7 @@ export class ArchiveSync {
     let cancelled = false;
     const pending = this.db.pendingAttachments();
     progress.addTotal(pending.length, `첨부 ${pending.length}개`);
-    for (const att of pending) {
+    for (const [i, att] of pending.entries()) {
       if (signal?.aborted) {
         cancelled = true;
         break;
@@ -461,7 +461,8 @@ export class ArchiveSync {
         warnings.push(`${att.courseName} 첨부 "${att.name}" 다운로드 실패: ${msg}`);
         out.failed++;
       }
-      progress.step(`첨부 ${att.name}`);
+      // 제출 파일 이름에는 학번·이름이 들어 있을 수 있어 진행률에는 번호만 싣는다.
+      progress.step(`첨부 ${i + 1}/${pending.length}`);
     }
     out.pending = this.db.pendingAttachments().length;
     return { files: out, cancelled };

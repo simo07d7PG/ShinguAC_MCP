@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { HttpStatusError, urlForMessage } from "../../src/http/errors.js";
 import { logger } from "../../src/log/logger.js";
 import { redact, registerSecret } from "../../src/log/redact.js";
 
@@ -21,6 +22,16 @@ describe("redact", () => {
   it("Cookie / Set-Cookie 값을 마스킹한다", () => {
     expect(redact("Cookie: JSESSIONID=abc; foo=bar")).toBe("Cookie: ***");
     expect(redact("Set-Cookie: sid=zzz; Path=/")).toBe("Set-Cookie: ***");
+  });
+
+  it("오류 메시지용 URL은 쿼리스트링(첨부 키)을 뺀다", () => {
+    expect(urlForMessage("https://cec.shingu.ac.kr/01shingu/eClassDown.jsp?file_key=20261020-abc")).toBe(
+      "https://cec.shingu.ac.kr/01shingu/eClassDown.jsp",
+    );
+    expect(new HttpStatusError(404, "https://student.shingu.ac.kr/file/download?fileKey=k9").message).toBe(
+      "HTTP 404: https://student.shingu.ac.kr/file/download",
+    );
+    expect(urlForMessage("not a url")).toBe("(잘못된 URL)");
   });
 
   it("첨부 키(file_key·fileKey·fileMasterKey)를 마스킹한다", () => {
