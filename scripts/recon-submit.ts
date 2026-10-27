@@ -19,7 +19,7 @@ function describe(label: string, html: string): void {
   console.log(`== ${label} (len=${html.length})`);
   $("form").each((_, f) => console.log("form", JSON.stringify($(f).attr())));
   $("input, textarea, select").each((_, el) => {
-    const a = $(el).attr();
+    const a = $(el).attr() ?? {};
     console.log(" ", el.tagName, a.type ?? "", a.name ?? "", a.id ?? "", a.accept ?? "", a.multiple !== undefined ? "multiple" : "", a.type === "hidden" ? `value.len=${(a.value ?? "").length}` : "");
   });
   $("script").each((_, s) => {

@@ -12,7 +12,7 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json",
     "recon": "tsx --env-file=.env scripts/recon.ts",
     "mask": "node scripts/mask-fixture.mjs",
     "check:pii": "node scripts/mask-fixture.mjs --check",

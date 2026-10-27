@@ -33,7 +33,7 @@ function fileHints(label: string, html: string): void {
   const $ = cheerio.load(html);
   const seen = new Set<string>();
   $("a[href], a[onclick], button[onclick], [data-file-master-key], [data-role=fileUploader], [data-role=fileViewer], input[name*=ile]").each((_, el) => {
-    const a = $(el).attr();
+    const a = $(el).attr() ?? {};
     const href = a.href ?? "";
     const onclick = a.onclick ?? "";
     if (!/down|file/i.test(href + onclick + JSON.stringify(a)) || /\/file\/download\?fileKey=$/.test(href)) return;
