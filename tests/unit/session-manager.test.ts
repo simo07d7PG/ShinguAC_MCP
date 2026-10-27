@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { AuthRejectedError, AuthUnsupportedError, SessionExpiredError } from "../../src/auth/errors.js";
+import {
+  AuthRejectedError,
+  AuthUnsupportedError,
+  SessionExpiredError,
+  WriteSessionLostError,
+} from "../../src/auth/errors.js";
 import { SessionManager } from "../../src/auth/session-manager.js";
+import { HttpClient } from "../../src/http/http-client.js";
+import { enterLecture } from "../../src/portal/eclass.js";
+import { RequestQueue } from "../../src/queue/request-queue.js";
 import { Secret } from "../../src/config/secret.js";
 import { ConfigError, type Config } from "../../src/config/config.js";
 import { registerSecret } from "../../src/log/redact.js";
@@ -102,5 +110,137 @@ describe("SessionManager", () => {
     mock.expireSession();
     await manager.request(dashboardGet);
     expect(mock.loginCount).toBe(2);
+  });
+});
+
+const CLAS = "https://student.shingu.ac.kr/eclass/clas";
+
+/**
+ * portal-mock에 E클래스 강의실을 얹는다. 포털처럼 "현재 강의"를 세션에 두고, 새 로그인(ssoLogin)이면 비운다.
+ * `log`에는 로그인 완료와 강의실 요청이 순서대로 남는다.
+ */
+function setupEclass() {
+  const mock = createPortalMock();
+  const log: string[] = [];
+  let valid = false;
+  let lecture: string | null = null;
+  let restoreExpires = false;
+  const fetchFn = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const url = new URL(String(input));
+    const method = init?.method ?? "GET";
+    if (url.pathname.startsWith("/eclass/")) {
+      const body = new URLSearchParams(typeof init?.body === "string" ? init.body : "");
+      log.push(`${method} ${url.pathname}${body.get("lectureSeq") ? ` ${body.get("lectureSeq")}` : ""}`);
+      if (!valid || (restoreExpires && url.pathname === "/eclass/clas/home")) {
+        return new Response(null, { status: 302, headers: { location: "/notlogin/t" } });
+      }
+      if (url.pathname === "/eclass/clas/home") lecture = body.get("lectureSeq");
+      return new Response(`lecture=${lecture ?? "none"}`, { status: 200, headers: { "content-type": "text/html" } });
+    }
+    const res = await mock.fetchMock(input, init);
+    if (url.pathname === "/ssoLogin") {
+      valid = true;
+      lecture = null;
+      log.push("login");
+    }
+    return res;
+  };
+  const client = new HttpClient({ fetch: fetchFn as typeof fetch, queue: new RequestQueue({ minGapMs: 0 }) });
+  const manager = new SessionManager({ client, loadConfig: config });
+  return {
+    mock,
+    log,
+    manager,
+    expire: (): void => {
+      valid = false;
+      mock.expireSession();
+    },
+    expireRestore: (): void => {
+      restoreExpires = true;
+    },
+  };
+}
+
+const homeworkGet = (client: HttpClient) => client.get(`${CLAS}/room/homework/homeworkList`);
+
+describe("SessionManager 강의 재진입", () => {
+  it("만료 → 재로그인 → 강의 재진입 → 원 요청 재전송 순서", async () => {
+    const { log, manager, expire } = setupEclass();
+    await enterLecture(manager, "L1");
+    expire();
+    log.length = 0;
+    const res = await manager.request(homeworkGet);
+    expect(res.text).toBe("lecture=L1");
+    expect(log).toEqual([
+      "GET /eclass/clas/room/homework/homeworkList",
+      "login",
+      "POST /eclass/clas/home L1",
+      "GET /eclass/clas/room/homework/homeworkList",
+    ]);
+  });
+
+  it("다른 요청이 세션을 무효화한 뒤 들어온 강의실 요청도 먼저 재진입한다", async () => {
+    const { log, manager, expire } = setupEclass();
+    await enterLecture(manager, "L1");
+    expire();
+    manager.invalidate();
+    log.length = 0;
+    const res = await manager.request(homeworkGet);
+    expect(res.text).toBe("lecture=L1");
+    expect(log).toEqual(["login", "POST /eclass/clas/home L1", "GET /eclass/clas/room/homework/homeworkList"]);
+  });
+
+  it("재로그인 뒤 동시 호출은 재진입을 한 번만 보낸다", async () => {
+    const { log, manager, expire } = setupEclass();
+    await enterLecture(manager, "L1");
+    expire();
+    manager.invalidate();
+    log.length = 0;
+    const results = await Promise.all([manager.request(homeworkGet), manager.request(homeworkGet), manager.request(homeworkGet)]);
+    expect(results.map((r) => r.text)).toEqual(["lecture=L1", "lecture=L1", "lecture=L1"]);
+    expect(log.filter((l) => l.startsWith("POST /eclass/clas/home"))).toEqual(["POST /eclass/clas/home L1"]);
+    expect(log.filter((l) => l === "login")).toHaveLength(1);
+  });
+
+  it("강의에 진입한 적이 없으면 재진입하지 않는다", async () => {
+    const { log, manager, expire } = setupEclass();
+    await manager.request(dashboardGet);
+    expire();
+    const res = await manager.request(homeworkGet);
+    expect(res.text).toBe("lecture=none");
+    expect(log.some((l) => l.startsWith("POST /eclass/clas/home"))).toBe(false);
+  });
+
+  it("enterLecture 자신의 요청은 재진입을 일으키지 않는다", async () => {
+    const { log, manager, expire } = setupEclass();
+    await enterLecture(manager, "L1");
+    expire();
+    log.length = 0;
+    await enterLecture(manager, "L2");
+    expect(log).toEqual(["POST /eclass/clas/home L2", "login", "POST /eclass/clas/home L2"]);
+    log.length = 0;
+    const res = await manager.request(homeworkGet);
+    expect(res.text).toBe("lecture=L2");
+    expect(log).toEqual(["GET /eclass/clas/room/homework/homeworkList"]);
+  });
+
+  it("재진입 응답도 만료면 SessionExpiredError", async () => {
+    const { manager, expire, expireRestore } = setupEclass();
+    await enterLecture(manager, "L1");
+    expire();
+    expireRestore();
+    const err = await manager.request(homeworkGet).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SessionExpiredError);
+  });
+
+  it("resend:false 쓰기는 만료 시 재전송 없이 WriteSessionLostError", async () => {
+    const { log, manager, expire } = setupEclass();
+    await enterLecture(manager, "L1");
+    expire();
+    log.length = 0;
+    const write = (client: HttpClient) => client.postForm(`${CLAS}/room/homework/submit`, { a: "1" });
+    const err = await manager.request(write, { resend: false }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(WriteSessionLostError);
+    expect(log).toEqual(["POST /eclass/clas/room/homework/submit"]);
   });
 });

@@ -24,7 +24,8 @@ export async function fetchEclassHome(session: SessionManager, term: AcademicTer
 
 /** 강의실 진입 — 1요청. 이후 `/eclass/clas/...` 요청은 이 강의 기준이다. */
 export async function enterLecture(session: SessionManager, lectureSeq: string): Promise<void> {
-  await session.request((c) => c.postForm(`${CLAS}/home`, { lectureSeq, redirect: "" }));
+  await session.request((c) => c.postForm(`${CLAS}/home`, { lectureSeq, redirect: "" }), { skipLectureRestore: true });
+  session.setCurrentLecture(lectureSeq);
 }
 
 export async function fetchHomeworkList(session: SessionManager): Promise<HomeworkRow[]> {
