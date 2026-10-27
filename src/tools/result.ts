@@ -8,7 +8,7 @@ import type { Result } from "../service/category-service.js";
 
 export const SOURCE_NOTE = "출처: 신구대학교 학생종합포털.";
 
-/** 조회 도구 공통 출력: `{ data, fetchedAt, stale, source, warning? }`. */
+/** 조회 도구 공통 출력: `{ data, fetchedAt }`. */
 export function withMeta<T extends z.ZodType>(data: T) {
   return MetaSchema.extend({ data });
 }

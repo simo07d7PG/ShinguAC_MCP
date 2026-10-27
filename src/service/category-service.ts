@@ -1,8 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { z } from "zod";
-import { LoginFailedError, SessionExpiredError, WriteSessionLostError } from "../auth/errors.js";
+import { WriteSessionLostError } from "../auth/errors.js";
 import type { SessionManager } from "../auth/session-manager.js";
-import { HttpStatusError, NetworkError, TimeoutError } from "../http/errors.js";
 import type { HttpClient } from "../http/http-client.js";
 import { logger as defaultLogger } from "../log/logger.js";
 import { redact } from "../log/redact.js";
@@ -44,8 +42,6 @@ import { fetchTimetable } from "../portal/timetable.js";
 import type {
   Assignment,
   AssignmentDetail,
-  Category,
-  CategoryData,
   Course,
   Grades,
   Meta,
@@ -54,7 +50,6 @@ import type {
   SubmitResult,
   TimetableEntry,
 } from "../schema/index.js";
-import type { SnapshotRecord, SnapshotStore } from "../store/snapshot-store.js";
 import { Mutex } from "../util/mutex.js";
 import { nowKst } from "../util/time.js";
 import { loadUploadFile, PORTAL_WIDGET_MAX_BYTES } from "./upload-file.js";
@@ -68,7 +63,6 @@ export interface CategoryServiceOptions {
   session: SessionManager;
   /** 로그인 불필요 요청(공개 CMS 공지)에 쓰는 클라이언트. 보통 session과 같은 HttpClient. */
   client: HttpClient;
-  store: SnapshotStore;
   now?: () => Date;
   logger?: Logger;
 }
@@ -101,26 +95,6 @@ class SubmitNotAppliedError extends Error {
   }
 }
 
-export interface RefreshSummary {
-  category: Category;
-  ok: boolean;
-  fetchedAt?: string;
-  error?: string;
-}
-
-/** 포털 장애·파서 예외처럼 스냅샷으로 대체할 수 있는 오류인가. 설정·자격증명 오류는 사용자가 조치해야 하므로 제외. */
-function isFallbackError(err: unknown): boolean {
-  return (
-    err instanceof NetworkError ||
-    err instanceof TimeoutError ||
-    err instanceof HttpStatusError ||
-    err instanceof SessionExpiredError ||
-    err instanceof LoginFailedError ||
-    err instanceof ParseError ||
-    err instanceof z.ZodError
-  );
-}
-
 function errorSummary(err: unknown): string {
   return redact(err instanceof Error ? `${err.name}: ${err.message}` : String(err));
 }
@@ -134,7 +108,6 @@ function inRange(iso: string | null, from: number, to: number): boolean {
 export class CategoryService {
   private readonly session: SessionManager;
   private readonly client: HttpClient;
-  private readonly store: SnapshotStore;
   private readonly now: () => Date;
   private readonly logger: Logger;
   /**
@@ -144,11 +117,14 @@ export class CategoryService {
   private readonly eclassLock = new Mutex();
   /** 미리보기 토큰 서명 키. 프로세스마다 새로 만들어, 모델이 토큰을 지어낼 수 없게 한다. */
   private readonly previewSecret = randomBytes(32);
+  /** 마지막 get_assignments 결과(reportSeq → 과제). lecture_seq 생략 시 강의를 찾는 데 쓴다. */
+  private readonly knownAssignments = new Map<string, Assignment>();
+  /** 마지막 get_notices 결과(id → 요약). 공지 본문 화면에 없는 제목·게시일을 채우는 데 쓴다. */
+  private readonly knownNotices = new Map<string, NoticeSummary>();
 
   constructor(options: CategoryServiceOptions) {
     this.session = options.session;
     this.client = options.client;
-    this.store = options.store;
     this.now = options.now ?? (() => new Date());
     this.logger = options.logger ?? defaultLogger;
   }
@@ -156,10 +132,10 @@ export class CategoryService {
   /**
    * 과제: 1(E클래스 홈) + 과목당 2(진입·목록) + 상세 N.
    * 상세(제출 상태)는 마감이 [now, now+dueWithinDays](미지정 14일) 안인 과제만 조회하고 나머지는 `unknown`.
-   * 스냅샷은 필터 전 전체, 반환은 dueWithinDays 지정 시 그 범위만.
+   * 반환은 dueWithinDays 지정 시 그 범위만(강의 색인은 필터 전 전체로 갱신).
    */
   async getAssignments(opts: { dueWithinDays?: number } = {}): Promise<Result<Assignment[]>> {
-    const result = await this.withSnapshot("assignments", () => this.eclassLock.run(async () => {
+    const result = await this.live(() => this.eclassLock.run(async () => {
       const from = this.now().getTime();
       const to = from + (opts.dueWithinDays ?? DEFAULT_DETAIL_DAYS) * DAY_MS;
       const lectures = await fetchEclassHome(this.session, currentAcademicTerm(this.now()));
@@ -180,6 +156,7 @@ export class CategoryService {
       }
       return all;
     }));
+    for (const a of result.data) this.knownAssignments.set(a.reportSeq, a);
     if (opts.dueWithinDays === undefined) return result;
     const from = this.now().getTime();
     const to = from + opts.dueWithinDays * DAY_MS;
@@ -189,7 +166,7 @@ export class CategoryService {
 
   /** 시간표: 1요청. */
   getTimetable(): Promise<Result<TimetableEntry[]>> {
-    return this.withSnapshot("timetable", async () => {
+    return this.live(async () => {
       const page = await fetchTimetable(this.session, currentAcademicTerm(this.now()));
       return page.entries;
     });
@@ -198,7 +175,7 @@ export class CategoryService {
   /** 수강 과목: 1(SSJ018P) + 1(E클래스 홈) [+ 매칭 과목당 3(진입·교수소개·수업계획서) — includeContacts]. */
   getCourses(opts: { includeContacts?: boolean } = {}): Promise<Result<Course[]>> {
     const includeContacts = opts.includeContacts ?? true;
-    return this.withSnapshot("courses", () => this.eclassLock.run(async () => {
+    return this.live(() => this.eclassLock.run(async () => {
       const courses = await fetchCurrentCourses(this.session);
       const lectures = await fetchEclassHome(this.session, currentAcademicTerm(this.now()));
       const out: Course[] = [];
@@ -231,12 +208,12 @@ export class CategoryService {
 
   /**
    * 공지 목록: 1(대시보드) [+ 1(E클래스 홈) + 과목당 2(진입·수업공지 목록) — includeEclass].
-   * 스냅샷은 전체, 반환은 category 필터 → 게시일 내림차순 → limit.
+   * 반환은 category 필터 → 게시일 내림차순 → limit.
    */
   async getNotices(
     opts: { category?: string; limit?: number; includeEclass?: boolean } = {},
   ): Promise<Result<NoticeSummary[]>> {
-    const result = await this.withSnapshot("notices", () => this.eclassLock.run(async () => {
+    const result = await this.live(() => this.eclassLock.run(async () => {
       const notices = await fetchDashboardNotices(this.session);
       if (opts.includeEclass) {
         const lectures = await fetchEclassHome(this.session, currentAcademicTerm(this.now()));
@@ -247,6 +224,7 @@ export class CategoryService {
       }
       return notices;
     }));
+    for (const n of result.data) this.knownNotices.set(n.id, n);
     const data = result.data
       .filter((n) => !opts.category || n.category === opts.category)
       .map((n, i) => ({ n, i }))
@@ -258,8 +236,7 @@ export class CategoryService {
 
   /**
    * 과제 상세(본문·첨부·제출 상태): 강의 진입 + 상세 = 2요청.
-   * lectureSeq가 없으면 assignments 스냅샷에서 reportSeq로 찾는다(get_assignments를 먼저 호출해야 함).
-   * 상세는 스냅샷을 두지 않으므로 포털 장애 시 fallback 없이 오류를 반환한다.
+   * lectureSeq가 없으면 마지막 get_assignments 결과에서 reportSeq로 찾는다.
    */
   async getAssignment(opts: { reportSeq: string; lectureSeq?: string }): Promise<Result<AssignmentDetail>> {
     const { reportSeq, lectureSeq, known } = await this.resolveLecture(opts.reportSeq, opts.lectureSeq);
@@ -285,7 +262,7 @@ export class CategoryService {
       scored: d.scored,
       detailUrl: `/eclass/clas/room/homework/homeworkDetail?reportSeq=${reportSeq}`,
     };
-    return { data, meta: { fetchedAt, stale: false, source: "live" } };
+    return { data, meta: { fetchedAt } };
   }
 
   /**
@@ -507,8 +484,8 @@ export class CategoryService {
   }
 
   /**
-   * reportSeq·lectureSeq 검증. lectureSeq가 없으면 assignments 스냅샷에서 찾는다.
-   * 둘 다 있는데 스냅샷의 강의와 다르면 거부한다(다른 과목 맥락으로 요청하지 않도록).
+   * reportSeq·lectureSeq 검증. lectureSeq가 없으면 마지막 get_assignments 결과에서 찾는다.
+   * 둘 다 있는데 그 결과의 강의와 다르면 거부한다(다른 과목 맥락으로 요청하지 않도록).
    */
   private async resolveLecture(
     rawReportSeq: string,
@@ -516,7 +493,7 @@ export class CategoryService {
   ): Promise<{ reportSeq: string; lectureSeq: string; known?: Assignment }> {
     const reportSeq = rawReportSeq.trim();
     if (!/^\d+$/.test(reportSeq)) throw new Error(`report_seq는 숫자여야 합니다: ${reportSeq}`);
-    const known = (await this.store.read("assignments"))?.data.find((a) => a.reportSeq === reportSeq);
+    const known = this.knownAssignments.get(reportSeq);
     const given = rawLectureSeq?.trim();
     if (given && known && known.lectureSeq !== given) {
       throw new Error(
@@ -536,42 +513,37 @@ export class CategoryService {
   /** 공지 본문: univ/scholarship → 공개 CMS 2요청(로그인 없음), eclass → 진입 + 본문 2요청. */
   getNotice(id: string): Promise<Result<NoticeDetail>> {
     const parsed = parseNoticeId(id);
-    return this.withFallback(
-      `notice ${id}`,
-      async () => {
-        const known = (await this.store.read("notices"))?.data.find((n) => n.id === id);
-        if (parsed.category === "eclass") {
-          const { lectureSeq, boardId, wrId } = parsed as Required<typeof parsed>;
-          const summary: NoticeSummary = known ?? {
-            id,
-            category: "eclass",
-            title: "",
-            postedAt: null,
-            url: `/eclass/clas/board/detail?boardId=${boardId}&wrId=${wrId}`,
-          };
-          return this.eclassLock.run(async () => {
-            await enterLecture(this.session, lectureSeq);
-            return fetchEclassBoardDetail(this.session, boardId, wrId, summary);
-          });
-        }
+    return this.live(async () => {
+      const known = this.knownNotices.get(id);
+      if (parsed.category === "eclass") {
+        const { lectureSeq, boardId, wrId } = parsed as Required<typeof parsed>;
         const summary: NoticeSummary = known ?? {
           id,
-          category: parsed.category,
+          category: "eclass",
           title: "",
           postedAt: null,
-          url: buildCmsUrl(parsed.category, parsed.bbsSeq!),
+          url: `/eclass/clas/board/detail?boardId=${boardId}&wrId=${wrId}`,
         };
-        return fetchCmsNoticeDetail(this.client, summary);
-      },
-      (detail, fetchedAt) => this.store.writeNotice(id, detail, fetchedAt),
-      () => this.store.readNotice(id),
-    );
+        return this.eclassLock.run(async () => {
+          await enterLecture(this.session, lectureSeq);
+          return fetchEclassBoardDetail(this.session, boardId, wrId, summary);
+        });
+      }
+      const summary: NoticeSummary = known ?? {
+        id,
+        category: parsed.category,
+        title: "",
+        postedAt: null,
+        url: buildCmsUrl(parsed.category, parsed.bbsSeq!),
+      };
+      return fetchCmsNoticeDetail(this.client, summary);
+    });
   }
 
   /** 성적: 3요청. semester(`YYYY-H`) 지정 시 해당 학기 행만 반환(이수학점 "전체" 합계 행은 유지). */
   async getGrades(opts: { semester?: string } = {}): Promise<Result<Grades>> {
     const term = opts.semester === undefined ? undefined : parseSemesterArg(opts.semester);
-    const result = await this.withSnapshot("grades", () => fetchGrades(this.session));
+    const result = await this.live(() => fetchGrades(this.session));
     if (!term) return result;
     const match = (r: { year?: number; semester?: string }): boolean =>
       r.year === term.year && r.semester === term.semester;
@@ -586,75 +558,9 @@ export class CategoryService {
     };
   }
 
-  /** 5개 범주를 순차로 수집한다. 스냅샷으로 대체된 범주는 ok=false. */
-  async refreshAll(): Promise<RefreshSummary[]> {
-    const jobs: Array<[Category, () => Promise<Result<unknown>>]> = [
-      ["assignments", () => this.getAssignments()],
-      ["timetable", () => this.getTimetable()],
-      ["courses", () => this.getCourses()],
-      ["notices", () => this.getNotices()],
-      ["grades", () => this.getGrades()],
-    ];
-    const out: RefreshSummary[] = [];
-    for (const [category, job] of jobs) {
-      try {
-        const { meta } = await job();
-        out.push(
-          meta.stale
-            ? { category, ok: false, error: meta.warning ?? "스냅샷으로 대체됨" }
-            : { category, ok: true, fetchedAt: meta.fetchedAt },
-        );
-      } catch (err) {
-        out.push({ category, ok: false, error: errorSummary(err) });
-      }
-    }
-    return out;
-  }
-
-  private withSnapshot<K extends Category>(
-    category: K,
-    fetcher: () => Promise<CategoryData[K]>,
-  ): Promise<Result<CategoryData[K]>> {
-    return this.withFallback(
-      category,
-      fetcher,
-      (data, fetchedAt) => this.store.write(category, data, fetchedAt),
-      () => this.store.read(category),
-    );
-  }
-
-  /** live 성공 → 스냅샷 저장 후 live 메타. fallback 대상 오류 → 스냅샷(stale), 스냅샷이 없으면 원 오류. */
-  private async withFallback<T>(
-    label: string,
-    fetcher: () => Promise<T>,
-    write: (data: T, fetchedAt: string) => Promise<void>,
-    read: () => Promise<SnapshotRecord<T> | null>,
-  ): Promise<Result<T>> {
-    let data: T;
-    try {
-      data = await fetcher();
-    } catch (err) {
-      if (!isFallbackError(err)) throw err;
-      const summary = errorSummary(err);
-      const snap = await read();
-      if (!snap) {
-        this.logger.warn(`${label}: live 실패, 스냅샷 없음`, summary);
-        throw err;
-      }
-      this.logger.warn(`${label}: live 실패, 스냅샷 사용`, summary);
-      return {
-        data: snap.data,
-        meta: {
-          fetchedAt: snap.fetchedAt,
-          stale: true,
-          source: "snapshot",
-          warning: `포털 조회 실패로 저장된 스냅샷을 반환합니다 (${summary})`,
-        },
-      };
-    }
+  /** 포털에서 읽고, 읽기 시작 시각을 fetchedAt으로 붙인다. */
+  private async live<T>(fetcher: () => Promise<T>): Promise<Result<T>> {
     const fetchedAt = nowKst(this.now());
-    await write(data, fetchedAt);
-    this.logger.debug(`${label}: live 수집 완료`);
-    return { data, meta: { fetchedAt, stale: false, source: "live" } };
+    return { data: await fetcher(), meta: { fetchedAt } };
   }
 }

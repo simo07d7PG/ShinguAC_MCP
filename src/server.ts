@@ -4,7 +4,7 @@ import { SessionManager } from "./auth/session-manager.js";
 import { loadConfig } from "./config/config.js";
 import { HttpClient } from "./http/http-client.js";
 import { CategoryService } from "./service/category-service.js";
-import { SnapshotStore } from "./store/snapshot-store.js";
+
 import { registerAllTools, type ToolService } from "./tools/index.js";
 
 // src/server.ts(tsx)와 dist/server.js 모두 한 단계 위가 패키지 루트다.
@@ -16,8 +16,7 @@ function createDefaultService(): CategoryService {
   const config = loadConfig();
   const client = new HttpClient();
   const session = new SessionManager({ client, loadConfig: () => config });
-  const store = new SnapshotStore(config.snapshotsDir);
-  return new CategoryService({ session, client, store });
+  return new CategoryService({ session, client });
 }
 
 /**

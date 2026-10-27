@@ -8,13 +8,7 @@ import type { Assignment, Course, Grades, Meta, NoticeDetail, NoticeSummary, Tim
 import { createServer } from "../../src/server.js";
 import type { ToolService } from "../../src/tools/index.js";
 
-const LIVE: Meta = { fetchedAt: "2026-10-26T12:00:00+09:00", stale: false, source: "live" };
-const STALE: Meta = {
-  fetchedAt: "2026-10-25T09:00:00+09:00",
-  stale: true,
-  source: "snapshot",
-  warning: "포털 조회 실패로 저장된 스냅샷을 반환합니다",
-};
+const LIVE: Meta = { fetchedAt: "2026-10-26T12:00:00+09:00" };
 
 const assignment: Assignment = {
   lectureSeq: "1",
@@ -51,7 +45,7 @@ function mockService(): { [K in keyof ToolService]: ReturnType<typeof vi.fn> } {
     })),
     getTimetable: vi.fn(async () => ({ data: entries, meta: LIVE })),
     getCourses: vi.fn(async () => ({ data: [course], meta: LIVE })),
-    getNotices: vi.fn(async () => ({ data: [notice], meta: STALE })),
+    getNotices: vi.fn(async () => ({ data: [notice], meta: LIVE })),
     getNotice: vi.fn(async () => ({ data: detail, meta: LIVE })),
     getGrades: vi.fn(async () => ({ data: grades, meta: LIVE })),
     submitAssignment: vi.fn(async () => ({
@@ -72,10 +66,6 @@ function mockService(): { [K in keyof ToolService]: ReturnType<typeof vi.fn> } {
       warnings: [],
       message: "미리보기",
     })),
-    refreshAll: vi.fn(async () => [
-      { category: "assignments", ok: true, fetchedAt: LIVE.fetchedAt },
-      { category: "grades", ok: false, error: "NetworkError: x" },
-    ]),
   };
 }
 
@@ -119,12 +109,11 @@ const TOOL_NAMES = [
   "get_notice",
   "get_notices",
   "get_timetable",
-  "refresh_snapshots",
   "submit_assignment",
 ];
 
 describe("tools/list", () => {
-  it("9개 도구와 입력·출력 스키마, 출처 표기를 노출한다", async () => {
+  it("8개 도구와 입력·출력 스키마, 출처 표기를 노출한다", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(TOOL_NAMES);
     for (const t of tools) {
@@ -198,18 +187,10 @@ describe("조회 도구", () => {
     ["get_notices", {}],
     ["get_notice", { id: "univ:1" }],
     ["get_grades", {}],
-  ])("%s: data + 메타 3필드를 반환한다", async (name, args) => {
+  ])("%s: data + fetchedAt을 반환한다", async (name, args) => {
     const out = structured(await call(name, args));
     expect(out).toHaveProperty("data");
-    expect(typeof out["fetchedAt"]).toBe("string");
-    expect(typeof out["stale"]).toBe("boolean");
-    expect(["live", "snapshot"]).toContain(out["source"]);
-  });
-
-  it("스냅샷 fallback 메타(stale·warning)를 그대로 전달한다", async () => {
-    const out = structured(await call("get_notices"));
-    expect(out).toMatchObject({ stale: true, source: "snapshot", fetchedAt: STALE.fetchedAt });
-    expect(out["warning"]).toContain("스냅샷");
+    expect(out["fetchedAt"]).toBe(LIVE.fetchedAt);
   });
 
   it("get_assignments: due_within_days를 dueWithinDays로 전달한다", async () => {
@@ -271,13 +252,6 @@ describe("조회 도구", () => {
   });
 });
 
-describe("refresh_snapshots", () => {
-  it("범주별 결과와 fetchedAt을 반환한다", async () => {
-    const out = structured(await call("refresh_snapshots"));
-    expect(out["results"]).toHaveLength(2);
-    expect(typeof out["fetchedAt"]).toBe("string");
-  });
-});
 
 describe("오류", () => {
   it("AuthRejectedError → isError + 설정 안내", async () => {

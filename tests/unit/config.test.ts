@@ -48,7 +48,6 @@ describe("loadConfig", () => {
     expect(c.id).toBe("env-id");
     expect(c.password.reveal()).toBe(PW);
     expect(c.homeDir).toBe(join(home, ".shingu-mcp"));
-    expect(c.snapshotsDir).toBe(join(home, ".shingu-mcp", "snapshots"));
   });
 
   it("env가 없으면 설정 파일로 fallback한다", () => {

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +10,6 @@ import { Secret } from "../../src/config/secret.js";
 import { HttpClient } from "../../src/http/http-client.js";
 import { RequestQueue } from "../../src/queue/request-queue.js";
 import { CategoryService } from "../../src/service/category-service.js";
-import { SnapshotStore } from "../../src/store/snapshot-store.js";
 
 const SENTINEL = "SENTINEL-PW-9f3a";
 const NOW = new Date("2026-10-26T12:00:00+09:00");
@@ -60,7 +59,7 @@ let offline: boolean | ((key: string) => boolean);
 let login: ReturnType<typeof vi.fn<(client: HttpClient, id: string, password: string) => Promise<void>>>;
 let loadConfig: () => Config;
 
-function makeService(): { service: CategoryService; store: SnapshotStore } {
+function makeService(): { service: CategoryService } {
   const fetchMock = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input));
     const method = init?.method ?? "GET";
@@ -78,9 +77,8 @@ function makeService(): { service: CategoryService; store: SnapshotStore } {
   };
   const client = new HttpClient({ fetch: fetchMock as typeof fetch, queue: new RequestQueue({ minGapMs: 0 }) });
   const session = new SessionManager({ client, login, loadConfig });
-  const store = new SnapshotStore(root, () => NOW);
   const logger = { debug: () => {}, info: () => {}, warn: () => {} };
-  return { service: new CategoryService({ session, client, store, now: () => NOW, logger }), store };
+  return { service: new CategoryService({ session, client, now: () => NOW, logger }) };
 }
 
 const paths = (method: string, path: string): Recorded[] =>
@@ -91,16 +89,16 @@ beforeEach(async () => {
   requests = [];
   offline = false;
   login = vi.fn(async (_c: HttpClient, _id: string, _pw: string) => {});
-  loadConfig = () => ({ id: "2000000000", password: new Secret(SENTINEL), homeDir: root, snapshotsDir: root });
+  loadConfig = () => ({ id: "2000000000", password: new Secret(SENTINEL), homeDir: root });
 });
 afterEach(() => rm(root, { recursive: true, force: true }));
 
 describe("CategoryService.getAssignments", () => {
-  it("live: 스냅샷 생성, source=live, 상세는 마감 범위 과제에만 요청", async () => {
-    const { service, store } = makeService();
+  it("live: fetchedAt 메타, 상세는 마감 범위 과제에만 요청", async () => {
+    const { service } = makeService();
     const res = await service.getAssignments({ dueWithinDays: 1 });
 
-    expect(res.meta).toEqual({ fetchedAt: "2026-10-26T12:00:00+09:00", stale: false, source: "live" });
+    expect(res.meta).toEqual({ fetchedAt: "2026-10-26T12:00:00+09:00" });
     // E클래스 홈은 현재 학년도/학기를 명시한다.
     const home = paths("GET", "/eclass/home");
     expect(home).toHaveLength(1);
@@ -123,13 +121,6 @@ describe("CategoryService.getAssignments", () => {
 
     expect(res.data).toHaveLength(32);
     expect(res.data.every((a) => a.submitStatus === "not_submitted")).toBe(true);
-
-    // 스냅샷은 필터 전 전체(4과목 × 30건); 범위 밖은 unknown, 제출 시작 전(34710)은 상세 없이 not_open
-    const snap = await store.read("assignments");
-    expect(snap?.fetchedAt).toBe("2026-10-26T12:00:00+09:00");
-    expect(snap?.data).toHaveLength(120);
-    expect(snap?.data.find((a) => a.reportSeq === "34710")?.submitStatus).toBe("not_open");
-    expect(snap?.data.find((a) => a.reportSeq === "34771")?.submitStatus).toBe("not_submitted");
   });
 
   it("due_within_days 미지정: 상세는 14일 범위, 반환은 전체", async () => {
@@ -138,42 +129,31 @@ describe("CategoryService.getAssignments", () => {
     // 연장기한(없으면 마감) 기준 14일 범위 12건 중 제출 시작 전 1건(34710)은 상세 생략 → 과목당 11건
     expect(paths("GET", "/eclass/clas/room/homework/homeworkDetail")).toHaveLength(44);
     expect(res.data).toHaveLength(120);
+    // 범위 밖은 unknown, 제출 시작 전(34710)은 상세 없이 not_open
+    expect(res.data.find((a) => a.reportSeq === "34710")?.submitStatus).toBe("not_open");
+    expect(res.data.find((a) => a.reportSeq === "34771")?.submitStatus).toBe("not_submitted");
   });
 
-  it("ECONNREFUSED: 스냅샷으로 stale 응답, fetchedAt은 스냅샷 값", async () => {
-    const { service, store } = makeService();
-    await store.write("assignments", [], "2026-10-20T09:00:00+09:00");
-    offline = true;
-    const res = await service.getAssignments();
-    expect(res.meta.stale).toBe(true);
-    expect(res.meta.source).toBe("snapshot");
-    expect(res.meta.fetchedAt).toBe("2026-10-20T09:00:00+09:00");
-    expect(res.meta.warning).toMatch(/NetworkError/);
-    expect(res.data).toEqual([]);
-  });
-
-  it("스냅샷 없음 + 실패: 원 오류 throw", async () => {
+  it("포털 실패: 원 오류 throw", async () => {
     const { service } = makeService();
     offline = true;
     await expect(service.getAssignments()).rejects.toMatchObject({ name: "NetworkError" });
   });
 
-  it("AuthRejectedError는 스냅샷이 있어도 fallback하지 않는다", async () => {
+  it("AuthRejectedError는 요청 없이 그대로 전달", async () => {
     login = vi.fn(async (_c: HttpClient, _id: string, _pw: string): Promise<void> => {
       throw new AuthRejectedError();
     });
-    const { service, store } = makeService();
-    await store.write("assignments", [], "2026-10-20T09:00:00+09:00");
+    const { service } = makeService();
     await expect(service.getAssignments()).rejects.toBeInstanceOf(AuthRejectedError);
     expect(requests).toHaveLength(0);
   });
 
-  it("ConfigError도 fallback하지 않는다", async () => {
+  it("ConfigError도 그대로 전달", async () => {
     loadConfig = () => {
       throw new ConfigError("자격증명을 찾을 수 없습니다.");
     };
-    const { service, store } = makeService();
-    await store.write("timetable", [], "2026-10-20T09:00:00+09:00");
+    const { service } = makeService();
     await expect(service.getTimetable()).rejects.toBeInstanceOf(ConfigError);
   });
 });
@@ -186,7 +166,7 @@ describe("CategoryService 기타 범주", () => {
     expect(new URL(req.url).searchParams.get("Yy")).toBe("2026");
     expect(new URL(req.url).searchParams.get("Haggi")).toBe("2");
     expect(res.data.length).toBeGreaterThan(0);
-    expect(res.meta.source).toBe("live");
+    expect(res.meta.fetchedAt).toBe("2026-10-26T12:00:00+09:00");
   });
 
   it("getCourses: E클래스 과목만 lectureSeq·연락처 병합, includeContacts=false면 진입 안 함", async () => {
@@ -218,39 +198,19 @@ describe("CategoryService 기타 범주", () => {
   });
 
   it("getGrades: 3요청, semester 필터는 반환 직전", async () => {
-    const { service, store } = makeService();
-    const all = await service.getGrades();
+    const { service } = makeService();
+    await service.getGrades();
     expect(requests).toHaveLength(3);
     const filtered = await service.getGrades({ semester: "2026-1" });
     expect(filtered.data.semesters.every((s) => s.year === 2026 && s.semester === "1")).toBe(true);
     expect(filtered.data.current).toHaveLength(0);
     expect(filtered.data.credits.every((c) => c.total || (c.year === 2026 && c.semester === "1"))).toBe(true);
-    // 스냅샷은 필터 전 전체
-    expect((await store.read("grades"))?.data).toEqual(all.data);
-  });
-
-  it("refreshAll: 성공·stale·실패 혼재 요약", async () => {
-    const { service, store } = makeService();
-    await store.write("grades", { semesters: [], credits: [], current: [] }, "2026-10-20T09:00:00+09:00");
-    offline = (key) => key.includes("/SSE/") || key.includes("/SSJ019P/");
-    const summary = await service.refreshAll();
-    expect(summary.map((s) => [s.category, s.ok])).toEqual([
-      ["assignments", true],
-      ["timetable", false],
-      ["courses", true],
-      ["notices", true],
-      ["grades", false],
-    ]);
-    expect(summary[0]!.fetchedAt).toBe("2026-10-26T12:00:00+09:00");
-    expect(summary[1]!.error).toMatch(/NetworkError/); // 스냅샷 없음 → 실패
-    expect(summary[4]!.error).toMatch(/스냅샷/); // 스냅샷으로 대체
-    expect(summary[4]!.fetchedAt).toBeUndefined();
   });
 });
 
 describe("CategoryService.getNotice", () => {
   it("univ:17703 → 페이지 GET 후 BoardViewData POST(sendForm 필드), 로그인 없이", async () => {
-    const { service, store } = makeService();
+    const { service } = makeService();
     const res = await service.getNotice("univ:17703");
 
     expect(login).not.toHaveBeenCalled();
@@ -282,7 +242,6 @@ describe("CategoryService.getNotice", () => {
     expect(post.headers["X-Requested-With"]).toBe("XMLHttpRequest");
     expect(post.headers["Referer"]).toBe(pageUrl);
 
-    expect(res.meta.source).toBe("live");
     expect(res.data.title).toBe("[대구한의대학교] K-MOOC 「청년 경제 토크콘서트」 개최 안내");
     expect(res.data.body).toContain("대구한의대학교에서 K-MOOC 「청년 경제 토크콘서트」를 개최하오니");
     expect(res.data.postedAt).toBe("2026-10-26T14:10:00+09:00");
@@ -290,10 +249,9 @@ describe("CategoryService.getNotice", () => {
       name: "[대구한의대학교] 청년 경제 토크콘서트 홍보 포스터.png",
       url: "https://www.shingu.ac.kr/ajaxfile/FR_SVC/FileDown.do?GBN=X01&BOARD_SEQ=4&SITE_NO=2&BBS_SEQ=17703&FILE_SEQ=1",
     });
-    expect((await store.readNotice("univ:17703"))?.data.title).toBe(res.data.title);
   });
 
-  it("eclass:<lectureSeq>:1:<wrId> → 강의 진입 후 board/detail, 목록 스냅샷의 요약을 이어받음", async () => {
+  it("eclass:<lectureSeq>:1:<wrId> → 강의 진입 후 board/detail, 목록 결과의 요약을 이어받음", async () => {
     const { service } = makeService();
     await service.getNotices({ includeEclass: true, limit: 100 });
     requests = [];
@@ -310,39 +268,13 @@ describe("CategoryService.getNotice", () => {
     expect(res.data.title).toBe("3ds max 설치 링크 (교육용으로 설치)");
     expect(res.data.body).toContain("autodesk.com");
   });
-
-  it("공지 본문도 네트워크 실패 시 스냅샷 fallback", async () => {
-    const { service } = makeService();
-    const live = await service.getNotice("univ:17703");
-    offline = true;
-    const stale = await service.getNotice("univ:17703");
-    expect(stale.meta).toMatchObject({ stale: true, source: "snapshot", fetchedAt: live.meta.fetchedAt });
-    expect(stale.data).toEqual(live.data);
-  });
-});
-
-describe("스냅샷 비밀번호 비노출", () => {
-  it("모든 범주 수집 후 스냅샷 파일 어디에도 센티넬 비밀번호가 없다", async () => {
-    const { service } = makeService();
-    await service.refreshAll();
-    await service.getNotice("univ:17703");
-    expect(login).toHaveBeenCalledWith(expect.anything(), "2000000000", SENTINEL);
-
-    const files = (await readdir(root, { recursive: true, withFileTypes: true }))
-      .filter((d) => d.isFile())
-      .map((d) => join(d.parentPath, d.name));
-    expect(files.length).toBeGreaterThanOrEqual(5 * 2 + 5 + 2);
-    for (const f of files) {
-      expect(await readFile(f, "utf8")).not.toContain(SENTINEL);
-    }
-  });
 });
 
 describe("CategoryService.getAssignment", () => {
   it("강의 진입 후 상세를 가져오고 본문·첨부·제출 상태를 반환한다", async () => {
     const { service } = makeService();
     const res = await service.getAssignment({ reportSeq: "34771", lectureSeq: "27962" });
-    expect(res.meta.source).toBe("live");
+    expect(res.meta.fetchedAt).toBe("2026-10-26T12:00:00+09:00");
     expect(res.data.reportSeq).toBe("34771");
     expect(res.data.lectureSeq).toBe("27962");
     expect(res.data.title.length).toBeGreaterThan(0);

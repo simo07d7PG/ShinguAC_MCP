@@ -1,19 +1,13 @@
 // 실계정으로 CategoryService를 끝까지 돌려 본다(읽기 전용). 개인 값은 건수·상태만 출력한다.
 // 사용: npx tsx --env-file=.env scripts/smoke-service.ts
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { mkdtempSync } from "node:fs";
 import { HttpClient } from "../src/http/http-client.js";
 import { SessionManager } from "../src/auth/session-manager.js";
-import { SnapshotStore } from "../src/store/snapshot-store.js";
 import { CategoryService } from "../src/service/category-service.js";
 import { logger } from "../src/log/logger.js";
 
-const root = process.env["SMOKE_SNAPSHOT_DIR"] ?? mkdtempSync(join(tmpdir(), "shingu-smoke-"));
 const client = new HttpClient();
 const session = new SessionManager({ client });
-const store = new SnapshotStore(root);
-const service = new CategoryService({ session, client, store });
+const service = new CategoryService({ session, client });
 
 async function step<T>(name: string, fn: () => Promise<T>, summarize: (v: T) => string): Promise<T | undefined> {
   const t0 = Date.now();
@@ -27,7 +21,7 @@ async function step<T>(name: string, fn: () => Promise<T>, summarize: (v: T) => 
   }
 }
 
-const tt = await step("getTimetable", () => service.getTimetable(), (r) => `entries=${r.data.length} source=${r.meta.source}`);
+const tt = await step("getTimetable", () => service.getTimetable(), (r) => `entries=${r.data.length}`);
 const gr = await step("getGrades", () => service.getGrades({}), (r) => `semesters=${r.data.semesters.length} credits=${r.data.credits.length} current=${r.data.current.length}`);
 const no = await step("getNotices", () => service.getNotices({ limit: 5 }), (r) => `n=${r.data.length} first=${r.data[0]?.id ?? "-"}`);
 if (no?.data[0]) {
@@ -35,10 +29,9 @@ if (no?.data[0]) {
 }
 const as = await step("getAssignments(7d)", () => service.getAssignments({ dueWithinDays: 7 }), (r) => {
   const by = r.data.reduce<Record<string, number>>((m, a) => ((m[a.submitStatus] = (m[a.submitStatus] ?? 0) + 1), m), {});
-  return `n=${r.data.length} status=${JSON.stringify(by)} source=${r.meta.source}`;
+  return `n=${r.data.length} status=${JSON.stringify(by)}`;
 });
 const co = await step("getCourses(contacts)", () => service.getCourses({ includeContacts: true }), (r) => `n=${r.data.length} withEmail=${r.data.filter((c) => c.professor.email).length} withOffice=${r.data.filter((c) => c.professor.office).length}`);
 
-logger.info(`snapshot root: ${root}`);
 const ok = [tt, gr, no, as, co].every(Boolean);
 process.exit(ok ? 0 : 1);

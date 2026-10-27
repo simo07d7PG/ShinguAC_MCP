@@ -11,7 +11,7 @@
 | E1 | Claude Code에 MCP 등록 후 새 세션에서 "이번 주 과제 뭐 있어?" | `.mcp.json`(로컬) + `~/.shingu-mcp/config.json` → `claude` |
 | E2 | 빌드된 서버를 stdio로 띄워 7개 도구 순차 호출 + 전체 단위/통합 테스트 | `npm run build && npm run smoke`, `npm test` |
 | E3 | 큐 단위 테스트(순차·간격·타임아웃·재시도) + 실측 요청 로그 | `npx vitest run tests/unit/request-queue.test.ts` |
-| E4 | 실패하는 fetch를 주입해 스냅샷 fallback 확인 | `npm run smoke:stale` |
+| E4 | ~~실패하는 fetch를 주입해 스냅샷 fallback 확인~~ (2026-10-27 스냅샷·fallback 제거로 폐기) | ~~`npm run smoke:stale`~~ |
 | E5 | README 3요소, 커밋 메시지 규칙, 금지 경로·PII 미추적 | `npm run check:pii`, `git ls-files`, `git log` |
 
 ## 실행 기록
@@ -31,7 +31,8 @@
 - [x] 모든 포털 요청(리다이렉트 hop 포함)이 `RequestQueue`를 경유함(`src/http/http-client.ts` `sendOnce`).
 - 간격 기준은 스펙 원안 500ms에서 2026-10-26 사용자 결정으로 200ms로 변경(`docs/portal-pages.md` §4.2).
 
-### AC-E4 — 포털 장애 시 stale 스냅샷 응답
+### AC-E4 — 포털 장애 시 stale 스냅샷 응답 (폐기)
+- 2026-10-27 사용자 결정으로 JSON 스냅샷과 fallback을 제거했다. 아래는 당시 기록.
 - [x] `npm run smoke:stale` (ECONNREFUSED를 던지는 fetch 주입, `~/.shingu-mcp/snapshots` 사용): getAssignments / getTimetable / getGrades / getNotices 모두 `stale: true`, `source: "snapshot"`, 이전 `fetchedAt` 유지, `warning`에 원인 요약.
 - [x] 스냅샷 없음 + 실패 → 에러: `tests/unit/category-service.test.ts`.
 - 실제 네트워크 차단(Wi-Fi off) 수동 검증은 미실시(동등한 주입 테스트로 대체).

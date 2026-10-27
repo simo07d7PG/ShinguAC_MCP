@@ -26,7 +26,7 @@ async function call(name: string, args: Record<string, unknown>, summarize: (sc:
     return false;
   }
   const sc = (res.structuredContent ?? {}) as Record<string, unknown> & Meta;
-  console.log(`✔ ${name} ${ms}ms — ${summarize(sc)} | source=${sc.source} stale=${sc.stale}${sc.warning ? " warning=" + sc.warning : ""}`);
+  console.log(`✔ ${name} ${ms}ms — ${summarize(sc)} | fetchedAt=${sc.fetchedAt}`);
   return true;
 }
 const len = (sc: Record<string, unknown>): number => (Array.isArray(sc["data"]) ? (sc["data"] as unknown[]).length : -1);
@@ -65,10 +65,6 @@ if (firstNotice) {
 results.push(await call("get_grades", {}, (sc) => {
   const d = sc["data"] as { semesters: unknown[]; credits: unknown[]; current: unknown[] };
   return `semesters=${d.semesters.length} credits=${d.credits.length} current=${d.current.length}`;
-}));
-results.push(await call("refresh_snapshots", {}, (sc) => {
-  const r = sc["results"] as { category: string; ok: boolean }[];
-  return r.map((x) => `${x.category}:${x.ok ? "ok" : "FAIL"}`).join(" ");
 }));
 
 await client.close();

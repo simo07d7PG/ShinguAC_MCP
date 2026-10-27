@@ -7,9 +7,9 @@ import type { Config } from "../../src/config/config.js";
 import { Secret } from "../../src/config/secret.js";
 import { HttpClient } from "../../src/http/http-client.js";
 import { RequestQueue } from "../../src/queue/request-queue.js";
-import type { SubmitResult } from "../../src/schema/index.js";
+import type { Assignment, SubmitResult } from "../../src/schema/index.js";
 import { CategoryService, type SubmitOptions } from "../../src/service/category-service.js";
-import { SnapshotStore } from "../../src/store/snapshot-store.js";
+
 
 const fixture = (name: string): string => readFileSync(new URL(`../fixtures/${name}`, import.meta.url), "utf8");
 const html = (text: string): Response =>
@@ -131,7 +131,7 @@ async function route(r: Recorded): Promise<Response> {
   }
 }
 
-function makeService(): { service: CategoryService; store: SnapshotStore } {
+function makeService(): { service: CategoryService } {
   const fetchMock = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input));
     const method = init?.method ?? "GET";
@@ -153,12 +153,10 @@ function makeService(): { service: CategoryService; store: SnapshotStore } {
     id: "2000000000",
     password: new Secret("pw"),
     homeDir: root,
-    snapshotsDir: root,
   });
   const session = new SessionManager({ client, login: vi.fn(async () => {}), loadConfig });
-  const store = new SnapshotStore(root, () => now);
   const logger = { debug: () => {}, info: () => {}, warn: () => {} };
-  return { service: new CategoryService({ session, client, store, now: () => now, logger }), store };
+  return { service: new CategoryService({ session, client, now: () => now, logger }) };
 }
 
 const sent = (path: string): Recorded[] => requests.filter((r) => r.path === path);
@@ -460,25 +458,19 @@ describe("submitAssignment: 입력·상태 검증", () => {
     await expect(service.submitAssignment(base)).rejects.toThrow(/과제 번호/);
   });
 
-  it("lecture_seq가 스냅샷의 강의와 다르면 거부", async () => {
-    const { service, store } = makeService();
-    await store.write(
-      "assignments",
-      [
-        {
-          lectureSeq: "27962",
-          reportSeq: "34771",
-          courseName: "과목",
-          title: "t",
-          startAt: null,
-          dueAt: null,
-          extendedDueAt: null,
-          submitStatus: "not_submitted",
-          detailUrl: "/x",
-        },
-      ],
-      "2026-10-26T12:00:00+09:00",
-    );
+  it("lecture_seq가 마지막 과제 목록의 강의와 다르면 거부", async () => {
+    const { service } = makeService();
+    (service as unknown as { knownAssignments: Map<string, Assignment> }).knownAssignments.set("34771", {
+      lectureSeq: "27962",
+      reportSeq: "34771",
+      courseName: "과목",
+      title: "t",
+      startAt: null,
+      dueAt: null,
+      extendedDueAt: null,
+      submitStatus: "not_submitted",
+      detailUrl: "/x",
+    });
     await expect(service.submitAssignment({ ...base, lectureSeq: "11111" })).rejects.toThrow(/강의\(27962\)와 다릅니다/);
     expect(requests).toHaveLength(0);
   });

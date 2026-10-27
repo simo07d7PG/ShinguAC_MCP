@@ -10,8 +10,6 @@ export interface Config {
   password: Secret;
   /** `<home>/.shingu-mcp` */
   homeDir: string;
-  /** `<homeDir>/snapshots` */
-  snapshotsDir: string;
 }
 
 export class ConfigError extends Error {
@@ -33,7 +31,7 @@ function guide(configPath: string): string {
   );
 }
 
-/** 자격증명·스냅샷 디렉터리(`<SHINGU_MCP_HOME 또는 홈>/.shingu-mcp`). */
+/** 자격증명·데이터 디렉터리(`<SHINGU_MCP_HOME 또는 홈>/.shingu-mcp`). */
 export function shinguHomeDir(): string {
   return join(process.env["SHINGU_MCP_HOME"] || homedir(), ".shingu-mcp");
 }
@@ -41,14 +39,13 @@ export function shinguHomeDir(): string {
 export function loadConfig(): Config {
   const homeDir = shinguHomeDir();
   const configPath = join(homeDir, "config.json");
-  const snapshotsDir = join(homeDir, "snapshots");
 
   const envId = process.env["SHINGU_ID"];
   const envPw = process.env["SHINGU_PW"];
 
   if (envId && envPw) {
     registerSecret(envPw);
-    return { id: envId, password: new Secret(envPw), homeDir, snapshotsDir };
+    return { id: envId, password: new Secret(envPw), homeDir };
   }
   if (envId || envPw) {
     const missing = envId ? "SHINGU_PW" : "SHINGU_ID";
@@ -81,5 +78,5 @@ export function loadConfig(): Config {
   }
 
   registerSecret(parsed.data.password);
-  return { id: parsed.data.id, password: new Secret(parsed.data.password), homeDir, snapshotsDir };
+  return { id: parsed.data.id, password: new Secret(parsed.data.password), homeDir };
 }

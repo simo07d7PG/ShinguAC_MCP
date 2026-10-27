@@ -13,7 +13,6 @@ const config = (): Config => ({
   id: "2000000000",
   password: new Secret(SENTINEL_PW),
   homeDir: "/h",
-  snapshotsDir: "/h/snapshots",
 });
 
 function setup(options: Parameters<typeof createPortalMock>[0] = {}) {

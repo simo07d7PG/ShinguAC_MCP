@@ -93,7 +93,7 @@ Windows에서는 `C:\Users\<사용자>\.shingu-mcp\config.json`입니다.
 주의:
 
 - `.mcp.json`에 비밀번호를 넣었다면 그 파일을 **커밋하지 마세요.**
-- 비밀번호는 로그, 스냅샷, 에러 메시지에 기록되지 않습니다.
+- 비밀번호는 로그, 에러 메시지에 기록되지 않습니다.
 
 ## 도구
 
@@ -106,7 +106,7 @@ Windows에서는 `C:\Users\<사용자>\.shingu-mcp\config.json`입니다.
 | `get_notices` | `category`(`univ`/`scholarship`/`eclass`), `limit`(1~100, 기본 20), `include_eclass`(기본 false) | 공지 목록 (최신순) | 약 0.4초 |
 | `get_notice` | `id`: `get_notices` 결과의 id | 공지 본문, 첨부파일 목록 | 약 0.7초 |
 | `get_grades` | `semester`(선택, `YYYY-H` 예: `2026-1`) | 학기별 성적, 이수구분별 학점, 이번 학기 과목별 성적 | 약 1.5초 |
-| `refresh_snapshots` | 없음 | 범주별 갱신 성공 여부 | 약 45초 |
+
 | `submit_assignment` | `report_seq`·`title`·`content`(필수), `lecture_seq`·`file_path`(절대 경로, 1개)·`confirm_token`(선택) | 토큰 없이 호출하면 미리보기(대상 과제, 마감·연장 감점, 덮어쓰기 경고, 기존 첨부)와 `confirmToken`. 그 토큰을 넣어 다시 호출하면 제출하고, 포털을 다시 읽어 `verified`로 반영 여부를 표시 | 미리보기 약 2초 |
 
 소요 시간은 실계정 실측값이며 네트워크와 수강 과목 수에 따라 달라집니다. `include_eclass`를 켜면 과목당 포털 요청이 2회 늘어납니다.
@@ -119,7 +119,7 @@ Windows에서는 `C:\Users\<사용자>\.shingu-mcp\config.json`입니다.
 - "이번 학기 수강 과목이랑 담당 교수 알려줘"
 - "지금까지 이수 학점이 몇 학점이야?"
 
-모든 조회 도구의 응답에는 `fetchedAt`, `stale`, `source`가 붙습니다.
+모든 조회 도구의 응답에는 포털에서 읽은 시각 `fetchedAt`이 붙습니다.
 
 ### 과제 제출 주의
 
@@ -134,10 +134,8 @@ Windows에서는 `C:\Users\<사용자>\.shingu-mcp\config.json`입니다.
 
 - 도구가 호출될 때만 포털에 로그인(SSO)하고 요청합니다. 백그라운드 폴링은 없습니다.
 - 포털 요청은 순차로 보내며 간격 200ms, 타임아웃 15초, 재시도 1회입니다. 과제 제출·첨부 업로드 요청은 재시도하지 않습니다(업로드 타임아웃 120초).
-- 결과는 `~/.shingu-mcp/snapshots/<범주>.json` 및 `.md`와 `~/.shingu-mcp/snapshots/history/<날짜>/`에 저장됩니다.
-- 포털 장애 시 마지막 스냅샷으로 `stale: true`와 함께 응답합니다.
-
-**민감정보 경고:** 스냅샷에는 성적, 과제 등이 **평문**으로 저장됩니다. 공용 PC에서 사용하지 말고, 해당 디렉터리를 공유/백업/커밋하지 않도록 주의하세요.
+- 조회 결과는 저장하지 않습니다. 포털 장애 시 조회 도구는 오류를 반환합니다.
+- 이전 버전이 만든 `~/.shingu-mcp/snapshots/` 폴더는 더 이상 쓰지 않으니 직접 삭제해도 됩니다.
 
 ## 주의사항
 
