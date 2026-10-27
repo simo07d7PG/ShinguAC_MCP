@@ -6,14 +6,14 @@ import { ConfigError } from "../config/config.js";
 import type { HttpClient } from "../http/http-client.js";
 import { logger as defaultLogger } from "../log/logger.js";
 import { redact } from "../log/redact.js";
-import { effectiveDeadline, parseHomeworkDetail, type HomeworkRow } from "../parsers/assignments.js";
+import { effectiveDeadline, needsSubmitProbe, parseHomeworkDetail, type HomeworkRow } from "../parsers/assignments.js";
 import { ParseError, fragmentToText } from "../parsers/common.js";
 import type { EclassLecture } from "../parsers/eclass.js";
 import { parseNoticeId } from "../parsers/notices.js";
-import { parseSubmitControls, plainOf, type FileDetail, type SubmitForm } from "../parsers/submit.js";
+import { judgeSubmission, type FileDetail, type SubmitForm } from "../parsers/submit.js";
 import { enterLecture, fetchEclassBoardAll, fetchEclassBoardPost, fetchEclassHome, fetchHomeworkList } from "../portal/eclass.js";
 import { currentAcademicTerm } from "../portal/semester.js";
-import { fetchFileInfo, fetchHomeworkDetailHtml, fetchSubmitForm } from "../portal/submit.js";
+import { fetchFileInfo, fetchHomeworkDetailHtml, fetchSubmissionForm } from "../portal/submit.js";
 import { PORTAL_ORIGIN } from "../portal/urls.js";
 import type { ArchiveDb, Board, PendingAttachment } from "../store/archive-db.js";
 import { BOARD_IDS } from "../store/archive-db.js";
@@ -217,17 +217,15 @@ export class ArchiveSync {
       const d = parseHomeworkDetail(html);
       // 마감이 지나면 상세 화면에 제출 버튼이 모두 사라져 "기간 아님"으로 보이지만, 제출했다면 editModal에 내용이 남아 있다
       // (실측 2026-10-27: 마감 지난 25건 중 9건). 그런 과제는 제출 폼을 한 번 읽어 판정한다.
-      const deadline = effectiveDeadline(d.extendedDueAt ?? d.dueAt ?? row.extendedDueAt ?? row.dueAt);
-      const ended = d.submitStatus === "not_open" && deadline !== null && this.now().getTime() > Date.parse(deadline);
       let submission: { form: SubmitForm; files: FileDetail[] } | undefined;
-      if (d.submitStatus === "submitted" || ended) {
+      if (needsSubmitProbe(d.submitStatus, d.extendedDueAt ?? d.dueAt ?? row.extendedDueAt ?? row.dueAt, this.now())) {
         try {
-          const controls = parseSubmitControls(html);
-          const form = await fetchSubmitForm(this.session, "edit", row.reportSeq, controls.reportNm);
-          const hasContent = form.title.trim() !== "" || plainOf(form.contentHtml) !== "" || form.attach.fileMasterKey !== "";
-          if (d.submitStatus === "submitted" || hasContent) {
+          const form = await fetchSubmissionForm(this.session, html, row.reportSeq);
+          if (form && judgeSubmission(form, d.submitStatus)) {
             const files = form.attach.fileMasterKey ? await fetchFileInfo(this.session, form.attach.fileMasterKey) : [];
             submission = { form, files };
+          } else if (!form && d.submitStatus === "submitted") {
+            warnings.push(`${label(`과제 ${row.reportSeq}`)}: 제출 내용을 읽지 못했습니다(제출 폼 형식 불일치)`);
           }
         } catch (err) {
           if (!(err instanceof ParseError)) throw err;

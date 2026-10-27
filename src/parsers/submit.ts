@@ -1,3 +1,4 @@
+import type { SubmitStatus } from "./assignments.js";
 import { ParseError, load, stripComments } from "./common.js";
 
 /** 과제 상세 화면에서 제출에 필요한 값. */
@@ -71,6 +72,15 @@ export function parseSubmitForm(html: string, formName: "registerForm" | "update
       maxFileCount: attr("max-file-count"),
     },
   };
+}
+
+/**
+ * 내 제출이 있는지 판정한다. 상세가 `submitted`면 그대로 true.
+ * 마감이 지나 버튼이 사라진 과제는 `editModal`에 제목·본문·첨부 키 중 하나라도 남아 있으면 제출한 것으로 본다.
+ */
+export function judgeSubmission(form: SubmitForm, detailStatus: SubmitStatus): boolean {
+  if (detailStatus === "submitted") return true;
+  return form.title.trim() !== "" || plainOf(form.contentHtml) !== "" || form.attach.fileMasterKey !== "";
 }
 
 export type FileDetail = Record<string, unknown>;

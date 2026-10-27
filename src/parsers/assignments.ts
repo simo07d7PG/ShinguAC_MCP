@@ -154,6 +154,16 @@ export function effectiveDeadline(iso: string | null): string | null {
   return `${prev.getUTCFullYear()}-${pad(prev.getUTCMonth() + 1)}-${pad(prev.getUTCDate())}T23:59:00+09:00`;
 }
 
+/**
+ * 제출 폼(`editModal`)을 읽어 제출 여부를 판정해야 하는 과제인가.
+ * 상세가 `submitted`이거나, `not_open`인데 마감(연장 기한 우선)이 지난 경우(마감 후엔 버튼이 사라져 제출해도 `not_open`으로 보인다).
+ */
+export function needsSubmitProbe(status: SubmitStatus, deadlineIso: string | null, now: Date): boolean {
+  if (status === "submitted") return true;
+  const deadline = effectiveDeadline(deadlineIso);
+  return status === "not_open" && deadline !== null && now.getTime() > Date.parse(deadline);
+}
+
 /** 목록 행 + (선택) 상세를 합쳐 스키마를 통과하는 Assignment 목록을 만든다. */
 export function buildAssignments(
   lecture: EclassLecture,

@@ -4,13 +4,14 @@ import type { SessionManager } from "../auth/session-manager.js";
 import type { HttpClient } from "../http/http-client.js";
 import { logger as defaultLogger } from "../log/logger.js";
 import { redact } from "../log/redact.js";
-import { buildAssignments, effectiveDeadline, parseHomeworkDetail, type HomeworkDetail } from "../parsers/assignments.js";
+import { buildAssignments, effectiveDeadline, needsSubmitProbe, parseHomeworkDetail, type HomeworkDetail } from "../parsers/assignments.js";
 import { ParseError } from "../parsers/common.js";
 import { mergeCourseContacts } from "../parsers/courses.js";
 import { buildCmsUrl, parseNoticeId } from "../parsers/notices.js";
 import {
   attachFields,
   extractAlert,
+  judgeSubmission,
   parseSubmitControls,
   plainOf,
   textToHtml,
@@ -34,6 +35,7 @@ import {
   fetchFileInfo,
   fetchFileMasterKey,
   fetchHomeworkDetailHtml,
+  fetchSubmissionForm,
   fetchSubmitForm,
   postReportSubmit,
   uploadAttachment,
@@ -189,7 +191,16 @@ export class CategoryService {
             details.set(row.reportSeq, await fetchHomeworkDetail(this.session, row.reportSeq));
           }
         }
-        all.push(...buildAssignments(lecture, rows, details, this.now()));
+        // 상세를 읽지 않은 과제는 아카이브 DB에 저장된 상태가 있으면 그것을 쓴다(포털 요청 없음).
+        all.push(
+          ...buildAssignments(lecture, rows, details, this.now()).map((a) => {
+            if (a.submitStatus !== "unknown") return a;
+            const stored = this.archiveDb?.getAssignmentState(a.reportSeq)?.submitStatus;
+            return stored === "submitted" || stored === "not_submitted" || stored === "not_open"
+              ? { ...a, submitStatus: stored as Assignment["submitStatus"] }
+              : a;
+          }),
+        );
       }
       return all;
     }));
@@ -280,7 +291,14 @@ export class CategoryService {
     const fetchedAt = nowKst(this.now());
     const d = await this.eclassLock.run(async () => {
       await enterLecture(this.session, lectureSeq);
-      return fetchHomeworkDetail(this.session, reportSeq);
+      const html = await fetchHomeworkDetailHtml(this.session, reportSeq);
+      const detail = parseHomeworkDetail(html);
+      // 마감이 지나면 버튼이 사라져 제출했어도 not_open으로 보인다 → editModal 1회로 판정(archive-sync와 같은 함수).
+      if (detail.submitStatus === "not_open" && needsSubmitProbe(detail.submitStatus, detail.extendedDueAt ?? detail.dueAt, this.now())) {
+        const form = await fetchSubmissionForm(this.session, html, reportSeq);
+        if (form && judgeSubmission(form, detail.submitStatus)) detail.submitStatus = "submitted";
+      }
+      return detail;
     });
     const data: AssignmentDetail = {
       lectureSeq,

@@ -9,6 +9,7 @@ import { ConfigError, type Config } from "../../src/config/config.js";
 import { Secret } from "../../src/config/secret.js";
 import { HttpClient } from "../../src/http/http-client.js";
 import { RequestQueue } from "../../src/queue/request-queue.js";
+import { ArchiveDb } from "../../src/store/archive-db.js";
 import { CategoryService } from "../../src/service/category-service.js";
 
 const SENTINEL = "SENTINEL-PW-9f3a";
@@ -59,7 +60,7 @@ let offline: boolean | ((key: string) => boolean);
 let login: ReturnType<typeof vi.fn<(client: HttpClient, id: string, password: string) => Promise<void>>>;
 let loadConfig: () => Config;
 
-function makeService(): { service: CategoryService } {
+function makeService(now: Date = NOW, archiveDb?: ArchiveDb): { service: CategoryService } {
   const fetchMock = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input));
     const method = init?.method ?? "GET";
@@ -78,7 +79,7 @@ function makeService(): { service: CategoryService } {
   const client = new HttpClient({ fetch: fetchMock as typeof fetch, queue: new RequestQueue({ minGapMs: 0 }) });
   const session = new SessionManager({ client, login, loadConfig });
   const logger = { debug: () => {}, info: () => {}, warn: () => {} };
-  return { service: new CategoryService({ session, client, now: () => NOW, logger }) };
+  return { service: new CategoryService({ session, client, now: () => now, logger, ...(archiveDb ? { archive: { db: archiveDb, filesDir: join(root, "files") } } : {}) }) };
 }
 
 const paths = (method: string, path: string): Recorded[] =>
@@ -270,6 +271,44 @@ describe("CategoryService.getNotice", () => {
   });
 });
 
+describe("CategoryService.getAssignments (아카이브 상태)", () => {
+  it("상세를 읽지 않은 unknown 과제는 아카이브 DB의 저장 상태를 쓰고 포털 요청은 늘지 않는다", async () => {
+    const plain = await makeService().service.getAssignments();
+    const target = plain.data.find((a) => a.submitStatus === "unknown")!;
+    const baseline = requests.length;
+    requests = [];
+
+    const db = new ArchiveDb(join(root, "eclass.db"));
+    try {
+      db.upsertCourse({ lectureSeq: target.lectureSeq, courseName: target.courseName, year: 2026, semester: "2" }, "2026-10-26T12:00:00+09:00");
+      db.upsertAssignment(
+        {
+          reportSeq: target.reportSeq,
+          lectureSeq: target.lectureSeq,
+          title: target.title,
+          startAt: null,
+          dueAt: target.dueAt,
+          extendedDueAt: target.extendedDueAt,
+          penaltyNote: null,
+          contentHtml: "",
+          contentText: "",
+          submitStatus: "submitted",
+        },
+        "2026-10-26T12:00:00+09:00",
+      );
+      const res = await makeService(NOW, db).service.getAssignments();
+      expect(requests).toHaveLength(baseline);
+      const same = (a: { reportSeq: string }): boolean => a.reportSeq === target.reportSeq;
+      expect(res.data.filter(same).every((a) => a.submitStatus === "submitted")).toBe(true);
+      // 저장된 상태가 없는 unknown은 그대로 unknown
+      const unknownLeft = (list: typeof res.data): number => list.filter((a) => a.submitStatus === "unknown" && !same(a)).length;
+      expect(unknownLeft(res.data)).toBe(unknownLeft(plain.data));
+    } finally {
+      db.close();
+    }
+  });
+});
+
 describe("CategoryService.getAssignment", () => {
   it("강의 진입 후 상세를 가져오고 본문·첨부·제출 상태를 반환한다", async () => {
     const { service } = makeService();
@@ -287,5 +326,57 @@ describe("CategoryService.getAssignment", () => {
   it("lecture_seq가 없고 스냅샷에도 없으면 안내 오류", async () => {
     const { service } = makeService();
     await expect(service.getAssignment({ reportSeq: "999" })).rejects.toThrow(/get_assignments/);
+  });
+
+  describe("마감 지난 not_open 과제의 제출 판정", () => {
+    const DETAIL = "GET student.shingu.ac.kr/eclass/clas/room/homework/homeworkDetail";
+    const EDIT = "GET student.shingu.ac.kr/eclass/clas/room/homework/editModal";
+    const LATER = new Date("2026-11-30T12:00:00+09:00");
+    const emptyModal = (): string =>
+      fixture("eclass/homework-edit-modal.html")
+        .replace(/(name="reportTitle"[^>]*value=')[^']*'/, "$1'")
+        .replace(/(<textarea[^>]*name="reportContent"[^>]*>)[\s\S]*?(<\/textarea>)/, "$1$2")
+        .replace(/data-file-master-key="[^"]*"/, 'data-file-master-key=""');
+    const modalRoute = (body: string) => (): Response =>
+      new Response(body, { status: 200, headers: { "content-type": "text/html;charset=UTF-8" } });
+    const editCount = (): number => paths("GET", "/eclass/clas/room/homework/editModal").length;
+    const call = (now: Date) => makeService(now).service.getAssignment({ reportSeq: "34771", lectureSeq: "27962" });
+
+    beforeEach(() => {
+      ROUTES[DETAIL] = () => html("eclass/homework-detail-not-open.html");
+    });
+    afterEach(() => {
+      ROUTES[DETAIL] = () => html("eclass/homework-detail-not-submitted.html");
+      delete ROUTES[EDIT];
+    });
+
+    it("editModal에 내용이 있으면 submitted, 요청은 1회만 늘어난다", async () => {
+      ROUTES[EDIT] = () => html("eclass/homework-edit-modal.html");
+      const res = await call(LATER);
+      expect(res.data.submitStatus).toBe("submitted");
+      expect(editCount()).toBe(1);
+      expect(paths("GET", "/eclass/clas/room/homework/homeworkDetail")).toHaveLength(1);
+      expect(paths("GET", "/file/info")).toHaveLength(0);
+      expect(requests).toHaveLength(3); // 진입 + 상세 + editModal
+    });
+
+    it("editModal이 비어 있으면 not_open 유지", async () => {
+      ROUTES[EDIT] = modalRoute(emptyModal());
+      const res = await call(LATER);
+      expect(res.data.submitStatus).toBe("not_open");
+      expect(editCount()).toBe(1);
+    });
+
+    it("editModal을 읽지 못하면(ParseError) not_open 유지", async () => {
+      ROUTES[EDIT] = modalRoute("<html><body>없음</body></html>");
+      const res = await call(LATER);
+      expect(res.data.submitStatus).toBe("not_open");
+    });
+
+    it("마감 전(제출 시작 전)이면 editModal을 읽지 않는다", async () => {
+      const res = await call(NOW);
+      expect(res.data.submitStatus).toBe("not_open");
+      expect(editCount()).toBe(0);
+    });
   });
 });

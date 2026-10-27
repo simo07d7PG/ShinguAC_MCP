@@ -4,6 +4,7 @@ import { ParseError } from "../../../src/parsers/common.js";
 import {
   attachFields,
   extractAlert,
+  judgeSubmission,
   parseFileInfo,
   parseMasterKey,
   parseSubmitControls,
@@ -112,5 +113,25 @@ describe("본문 변환·비교", () => {
       "제출 기간이 아닙니다.",
     );
     expect(extractAlert("<html></html>")).toBeUndefined();
+  });
+});
+
+describe("judgeSubmission", () => {
+  const empty = () => {
+    const f = parseSubmitForm(fixture("eclass/homework-edit-modal.html"), "updateForm");
+    return { ...f, title: "", contentHtml: "", attach: { ...f.attach, fileMasterKey: "" } };
+  };
+  it("상세가 submitted면 폼이 비어 있어도 true", () => {
+    expect(judgeSubmission(empty(), "submitted")).toBe(true);
+  });
+  it("not_open + 폼이 모두 비면 false (공백·빈 단락만 있는 본문 포함)", () => {
+    expect(judgeSubmission(empty(), "not_open")).toBe(false);
+    expect(judgeSubmission({ ...empty(), title: "  ", contentHtml: "<p>&nbsp;</p>" }, "not_open")).toBe(false);
+  });
+  it("not_open + 제목 / 본문 / 첨부 키 중 하나만 있어도 true", () => {
+    expect(judgeSubmission({ ...empty(), title: "제목" }, "not_open")).toBe(true);
+    expect(judgeSubmission({ ...empty(), contentHtml: "<p>내용</p>" }, "not_open")).toBe(true);
+    const e = empty();
+    expect(judgeSubmission({ ...e, attach: { ...e.attach, fileMasterKey: "K" } }, "not_open")).toBe(true);
   });
 });

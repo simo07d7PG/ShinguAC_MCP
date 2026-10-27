@@ -1,7 +1,9 @@
 import type { SessionManager } from "../auth/session-manager.js";
+import { ParseError } from "../parsers/common.js";
 import {
   parseFileInfo,
   parseMasterKey,
+  parseSubmitControls,
   parseSubmitForm,
   parseUploadResult,
   type AttachConfig,
@@ -36,6 +38,24 @@ export async function fetchSubmitForm(
     c.get(`${HOMEWORK}/${kind}Modal?${q}`, { headers: { Accept: "text/html;", "X-Requested-With": "XMLHttpRequest" } }),
   );
   return parseSubmitForm(res.text, kind === "register" ? "registerForm" : "updateForm");
+}
+
+/**
+ * 상세 화면 HTML에서 과제명을 읽어 `editModal`을 연다 — 1요청. 폼이나 과제명을 읽지 못하면(ParseError) undefined.
+ * 제출 판정(`judgeSubmission`)에 쓰며, 첨부 목록은 따로 읽지 않는다.
+ */
+export async function fetchSubmissionForm(
+  session: SessionManager,
+  detailHtml: string,
+  reportSeq: string,
+): Promise<SubmitForm | undefined> {
+  try {
+    const { reportNm } = parseSubmitControls(detailHtml);
+    return await fetchSubmitForm(session, "edit", reportSeq, reportNm);
+  } catch (err) {
+    if (err instanceof ParseError) return undefined;
+    throw err;
+  }
 }
 
 /** 새 첨부 묶음 키 발급 — 1요청. 포털 화면도 제출 폼을 열 때마다 하나 발급받는다. */
