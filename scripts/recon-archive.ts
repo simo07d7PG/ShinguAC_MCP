@@ -19,7 +19,9 @@ const CLAS = `${PORTAL_ORIGIN}/eclass/clas`;
 const allowedHosts = [...DEFAULT_ALLOWED_HOSTS, "cec.shingu.ac.kr"];
 const client = new HttpClient({ allowedHosts });
 const session = new SessionManager({ client });
-const get = (url: string): Promise<HttpResponse> => session.request((c) => c.get(url));
+// 강의실(`/eclass/clas/`) 요청은 재로그인 뒤 강의에 다시 들어가도록 lectureScoped로 보낸다.
+const get = (url: string): Promise<HttpResponse> =>
+  session.request((c) => c.get(url), { lectureScoped: url.includes("/eclass/clas/") });
 
 function headers(label: string, res: HttpResponse): void {
   const h = res.headers;
