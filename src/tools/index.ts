@@ -7,6 +7,7 @@ import { registerGetGrades } from "./get-grades.js";
 import { registerGetNotice } from "./get-notice.js";
 import { registerGetNotices } from "./get-notices.js";
 import { registerGetTimetable } from "./get-timetable.js";
+import { registerSearchArchive } from "./search-archive.js";
 import { registerSubmitAssignment } from "./submit-assignment.js";
 import { registerSyncEclass } from "./sync-eclass.js";
 
@@ -21,6 +22,7 @@ export type ToolService = Pick<
   | "getGrades"
   | "submitAssignment"
   | "syncArchive"
+  | "searchArchive"
 >;
 
 /** 도구 호출 시점에 서비스를 얻는다. 설정이 없으면 ConfigError를 던진다. */
@@ -36,4 +38,5 @@ export function registerAllTools(server: McpServer, getService: GetService): voi
   registerGetGrades(server, getService);
   registerSubmitAssignment(server, getService);
   registerSyncEclass(server, getService);
+  registerSearchArchive(server, getService);
 }

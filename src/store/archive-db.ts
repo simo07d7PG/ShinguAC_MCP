@@ -63,6 +63,61 @@ export interface PendingAttachment {
   url: string;
 }
 
+/** 검색 결과의 첨부. localPath는 files 디렉터리 기준 상대 경로(내려받기 전이면 null). url·error는 담지 않는다. */
+export interface ArchiveAttachmentHit {
+  name: string;
+  localPath: string | null;
+}
+
+export interface AssignmentSearchFilter {
+  course?: string;
+  query?: string;
+  status?: string;
+  /** KST 날짜 YYYY-MM-DD. 마감(연장기한 우선)이 이 날 0시 이후. */
+  dueFrom?: string;
+  /** KST 날짜 YYYY-MM-DD. 마감(연장기한 우선)이 이 날 23:59:59까지. */
+  dueTo?: string;
+  limit: number;
+}
+
+export interface AssignmentHit {
+  lectureSeq: string;
+  courseName: string;
+  reportSeq: string;
+  title: string;
+  startAt: string | null;
+  dueAt: string | null;
+  extendedDueAt: string | null;
+  submitStatus: string;
+  contentText: string;
+  attachments: ArchiveAttachmentHit[];
+  submission?: { title: string; contentText: string; attachments: ArchiveAttachmentHit[] };
+}
+
+export interface PostSearchFilter {
+  course?: string;
+  query?: string;
+  board?: Board;
+  limit: number;
+}
+
+export interface PostHit {
+  lectureSeq: string;
+  courseName: string;
+  board: Board;
+  wrId: string;
+  title: string;
+  postedAt: string | null;
+  author: string | null;
+  bodyText: string;
+  attachments: ArchiveAttachmentHit[];
+}
+
+/** LIKE 패턴용으로 %, _, \를 이스케이프하고 양쪽에 %를 붙인다(ESCAPE '\\'와 함께 쓴다). */
+function likePattern(input: string): string {
+  return `%${input.replace(/[\\%_]/g, "\\$&")}%`;
+}
+
 const MIGRATIONS: string[] = [
   `
   CREATE TABLE courses (
@@ -379,6 +434,144 @@ export class ArchiveDb {
 
   markDownloadFailed(id: number, error: string): void {
     this.db.prepare("UPDATE attachments SET error = ? WHERE id = ?").run(error, id);
+  }
+
+  /** 과목 행이 하나라도 있는가(아카이브가 비었는지 판단). */
+  hasCourses(): boolean {
+    return this.db.prepare("SELECT 1 FROM courses LIMIT 1").get() !== undefined;
+  }
+
+  private attachmentHits(ownerType: OwnerType, ownerKey: string): ArchiveAttachmentHit[] {
+    return (
+      this.db
+        .prepare("SELECT name, local_path FROM attachments WHERE owner_type = ? AND owner_key = ? ORDER BY position")
+        .all(ownerType, ownerKey) as { name: string; local_path: string | null }[]
+    ).map((r) => ({ name: r.name, localPath: r.local_path }));
+  }
+
+  /** 과제 검색. 마감(연장기한 우선) 오름차순, 마감 없음은 뒤. total은 limit 적용 전 건수. */
+  searchAssignments(f: AssignmentSearchFilter): { total: number; items: AssignmentHit[] } {
+    const due = "COALESCE(a.extended_due_at, a.due_at)";
+    const where: string[] = [];
+    const params: string[] = [];
+    if (f.course) {
+      where.push("c.course_name LIKE ? ESCAPE '\\'");
+      params.push(likePattern(f.course));
+    }
+    if (f.query) {
+      where.push("(a.title LIKE ? ESCAPE '\\' OR a.content_text LIKE ? ESCAPE '\\')");
+      params.push(likePattern(f.query), likePattern(f.query));
+    }
+    if (f.status) {
+      where.push("a.submit_status = ?");
+      params.push(f.status);
+    }
+    if (f.dueFrom) {
+      where.push(`${due} >= ?`);
+      params.push(`${f.dueFrom}T00:00:00+09:00`);
+    }
+    if (f.dueTo) {
+      where.push(`${due} <= ?`);
+      params.push(`${f.dueTo}T23:59:59+09:00`);
+    }
+    const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const from = "FROM assignments a JOIN courses c ON c.lecture_seq = a.lecture_seq";
+    const { n } = this.db.prepare(`SELECT COUNT(*) AS n ${from} ${clause}`).get(...params) as { n: number };
+    const rows = this.db
+      .prepare(
+        `SELECT a.lecture_seq, c.course_name, a.report_seq, a.title, a.start_at, a.due_at, a.extended_due_at,
+           a.submit_status, a.content_text, s.title AS sub_title, s.content_text AS sub_text
+         ${from} LEFT JOIN submissions s ON s.report_seq = a.report_seq
+         ${clause}
+         ORDER BY (${due} IS NULL), ${due} ASC, a.report_seq LIMIT ?`,
+      )
+      .all(...params, f.limit) as {
+      lecture_seq: string;
+      course_name: string;
+      report_seq: string;
+      title: string;
+      start_at: string | null;
+      due_at: string | null;
+      extended_due_at: string | null;
+      submit_status: string;
+      content_text: string;
+      sub_title: string | null;
+      sub_text: string | null;
+    }[];
+    const items = rows.map((r): AssignmentHit => {
+      const hit: AssignmentHit = {
+        lectureSeq: r.lecture_seq,
+        courseName: r.course_name,
+        reportSeq: r.report_seq,
+        title: r.title,
+        startAt: r.start_at,
+        dueAt: r.due_at,
+        extendedDueAt: r.extended_due_at,
+        submitStatus: r.submit_status,
+        contentText: r.content_text,
+        attachments: this.attachmentHits("assignment", r.report_seq),
+      };
+      if (r.sub_title !== null) {
+        hit.submission = {
+          title: r.sub_title,
+          contentText: r.sub_text ?? "",
+          attachments: this.attachmentHits("submission", r.report_seq),
+        };
+      }
+      return hit;
+    });
+    return { total: n, items };
+  }
+
+  /** 게시글 검색. 등록일시 내림차순(등록일시 없음은 뒤). total은 limit 적용 전 건수. */
+  searchPosts(f: PostSearchFilter): { total: number; items: PostHit[] } {
+    const where: string[] = [];
+    const params: string[] = [];
+    if (f.course) {
+      where.push("c.course_name LIKE ? ESCAPE '\\'");
+      params.push(likePattern(f.course));
+    }
+    if (f.query) {
+      where.push("(p.title LIKE ? ESCAPE '\\' OR p.body_text LIKE ? ESCAPE '\\')");
+      params.push(likePattern(f.query), likePattern(f.query));
+    }
+    if (f.board) {
+      where.push("p.board = ?");
+      params.push(f.board);
+    }
+    const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const from = "FROM posts p JOIN courses c ON c.lecture_seq = p.lecture_seq";
+    const { n } = this.db.prepare(`SELECT COUNT(*) AS n ${from} ${clause}`).get(...params) as { n: number };
+    const rows = this.db
+      .prepare(
+        `SELECT p.lecture_seq, c.course_name, p.board, p.wr_id, p.title, p.posted_at, p.author, p.body_text
+         ${from} ${clause}
+         ORDER BY (p.posted_at IS NULL), p.posted_at DESC, p.wr_id DESC LIMIT ?`,
+      )
+      .all(...params, f.limit) as {
+      lecture_seq: string;
+      course_name: string;
+      board: Board;
+      wr_id: string;
+      title: string;
+      posted_at: string | null;
+      author: string | null;
+      body_text: string;
+    }[];
+    const items = rows.map(
+      (r): PostHit => ({
+        lectureSeq: r.lecture_seq,
+        courseName: r.course_name,
+        board: r.board,
+        wrId: r.wr_id,
+        title: r.title,
+        postedAt: r.posted_at,
+        author: r.author,
+        bodyText: r.body_text,
+        attachments: this.attachmentHits("post", `${r.lecture_seq}:${r.board}:${r.wr_id}`),
+      }),
+    );
+    return { total: n, items };
   }
 
   /** 테스트·진단용 단순 조회. */

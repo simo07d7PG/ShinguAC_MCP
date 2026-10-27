@@ -40,6 +40,7 @@ import {
 } from "../portal/submit.js";
 import { fetchTimetable } from "../portal/timetable.js";
 import type {
+  ArchiveSearchResult,
   Assignment,
   AssignmentDetail,
   Course,
@@ -53,6 +54,7 @@ import type {
 import type { ArchiveDb } from "../store/archive-db.js";
 import { Mutex } from "../util/mutex.js";
 import { nowKst } from "../util/time.js";
+import { searchArchive, type ArchiveSearchInput } from "./archive-search.js";
 import { ArchiveSync, type SyncOptions, type SyncSummary } from "./archive-sync.js";
 import { loadUploadFile, PORTAL_WIDGET_MAX_BYTES } from "./upload-file.js";
 
@@ -128,6 +130,7 @@ export class CategoryService {
   private readonly archiveDb?: ArchiveDb;
   private readonly archive?: ArchiveSync;
   private readonly archiveError?: string;
+  private readonly archiveFilesDir?: string;
   /** 마지막 get_notices 결과(id → 요약). 공지 본문 화면에 없는 제목·게시일을 채우는 데 쓴다. */
   private readonly knownNotices = new Map<string, NoticeSummary>();
 
@@ -139,6 +142,7 @@ export class CategoryService {
     this.archiveError = options.archiveError;
     if (options.archive) {
       this.archiveDb = options.archive.db;
+      this.archiveFilesDir = options.archive.filesDir;
       this.archive = new ArchiveSync({
         session: this.session,
         client: this.client,
@@ -154,6 +158,12 @@ export class CategoryService {
   async syncArchive(opts: SyncOptions = {}): Promise<SyncSummary> {
     if (!this.archive) throw new Error(this.archiveError ?? "E클래스 아카이브 저장소가 설정되지 않았습니다.");
     return this.archive.sync(opts);
+  }
+
+  /** 로컬 아카이브 검색(포털 요청 없음). */
+  searchArchive(input: ArchiveSearchInput): ArchiveSearchResult {
+    if (!this.archiveDb || !this.archiveFilesDir) throw new Error(this.archiveError ?? "E클래스 아카이브 저장소가 설정되지 않았습니다.");
+    return searchArchive(this.archiveDb, this.archiveFilesDir, input);
   }
 
   /**

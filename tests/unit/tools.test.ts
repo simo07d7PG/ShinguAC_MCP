@@ -66,6 +66,7 @@ function mockService(): { [K in keyof ToolService]: ReturnType<typeof vi.fn> } {
       warnings: [],
       message: "미리보기",
     })),
+    searchArchive: vi.fn(() => ({ kind: "assignments" as const, total: 0, items: [], note: "비어 있음" })),
     syncArchive: vi.fn(async () => ({
       term: "2026-2",
       syncedAt: LIVE.fetchedAt,
@@ -128,12 +129,13 @@ const TOOL_NAMES = [
   "get_notice",
   "get_notices",
   "get_timetable",
+  "search_archive",
   "submit_assignment",
   "sync_eclass",
 ];
 
 describe("tools/list", () => {
-  it("9개 도구와 입력·출력 스키마, 출처 표기를 노출한다", async () => {
+  it("10개 도구와 입력·출력 스키마, 출처 표기를 노출한다", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(TOOL_NAMES);
     for (const t of tools) {
@@ -281,6 +283,36 @@ describe("sync_eclass", () => {
     expect((out["files"] as { downloaded: number }).downloaded).toBe(2);
     await call("sync_eclass");
     expect(service.syncArchive).toHaveBeenLastCalledWith({ downloadFiles: undefined, full: undefined });
+  });
+});
+
+describe("search_archive", () => {
+  it("입력을 서비스에 전달하고 기본값(assignments, 20)을 채운다", async () => {
+    const out = structured(await call("search_archive", { course: "자료", due_from: "2026-10-01", due_to: "2026-10-31", status: "submitted" }));
+    expect(service.searchArchive).toHaveBeenLastCalledWith({
+      kind: "assignments",
+      course: "자료",
+      query: undefined,
+      board: undefined,
+      status: "submitted",
+      dueFrom: "2026-10-01",
+      dueTo: "2026-10-31",
+      limit: 20,
+    });
+    expect(out["note"]).toBe("비어 있음");
+  });
+
+  it("잘못된 날짜·limit은 거부", async () => {
+    expect((await call("search_archive", { due_from: "2026-13-40" })).isError).toBe(true);
+    expect((await call("search_archive", { limit: 101 })).isError).toBe(true);
+    expect(service.searchArchive).not.toHaveBeenCalled();
+  });
+
+  it("서비스 오류는 isError", async () => {
+    service.searchArchive.mockImplementationOnce(() => {
+      throw new Error("아카이브 없음");
+    });
+    expect((await call("search_archive")).isError).toBe(true);
   });
 });
 
