@@ -1,4 +1,5 @@
 import { resolve, sep } from "node:path";
+import { effectiveDeadline } from "../parsers/assignments.js";
 import type { ArchiveSearchResult } from "../schema/index.js";
 import type { ArchiveAttachmentHit, ArchiveDb, Board } from "../store/archive-db.js";
 
@@ -75,8 +76,9 @@ export function searchArchive(db: ArchiveDb, filesDir: string, input: ArchiveSea
       reportSeq: a.reportSeq,
       title: a.title,
       startAt: a.startAt,
-      dueAt: a.dueAt,
-      extendedDueAt: a.extendedDueAt,
+      // get_assignments와 같이 실제 마감(00:00 → 전날 23:59)으로 보여 준다.
+      dueAt: effectiveDeadline(a.dueAt),
+      extendedDueAt: effectiveDeadline(a.extendedDueAt),
       submitStatus: a.submitStatus,
       contentExcerpt: excerpt(a.contentText),
       attachments: attachments(a.attachments, filesDir),

@@ -101,6 +101,25 @@ describe("search_archive: assignments", () => {
     expect(seqs({ dueFrom: "2000-01-01" })).not.toContain("12");
   });
 
+  it("00:00 마감은 전날 23:59로 보여 주고 필터·정렬도 그 기준", () => {
+    db.upsertAssignment(assignment({ reportSeq: "40", title: "자정 마감", dueAt: "2026-11-01T00:00:00+09:00" }), T);
+    db.upsertAssignment(assignment({ reportSeq: "41", title: "직전 마감", dueAt: "2026-10-31T23:59:30+09:00" }), T);
+    db.upsertAssignment(
+      assignment({ reportSeq: "42", title: "연장 자정", dueAt: null, extendedDueAt: "2026-10-31T00:00:00+09:00" }),
+      T,
+    );
+    const item = search({ query: "자정 마감" }).items[0] as { dueAt: string | null; extendedDueAt: string | null };
+    expect(item.dueAt).toBe("2026-10-31T23:59:00+09:00");
+    const ext = search({ query: "연장 자정" }).items[0] as { dueAt: string | null; extendedDueAt: string | null };
+    expect(ext.extendedDueAt).toBe("2026-10-30T23:59:00+09:00");
+    // 실제 마감 10-31 23:59 → 10-31 범위에 들고 11-01 범위에는 들지 않는다.
+    expect(seqs({ dueFrom: "2026-11-01" })).toEqual(["11"]);
+    expect(seqs({ dueFrom: "2026-10-31", dueTo: "2026-10-31" })).toEqual(["40", "41"]);
+    // 42는 실제 마감 10-30 23:59.
+    expect(seqs({ dueFrom: "2026-10-30", dueTo: "2026-10-30" })).toEqual(["10", "42"]);
+    expect(seqs({ dueTo: "2026-10-29" })).toEqual(["13"]);
+  });
+
   it("LIKE 와일드카드를 이스케이프하고 SQL 주입은 문자열로만 취급", () => {
     expect(search({ query: "%" }).total).toBe(0);
     expect(search({ query: "_" }).total).toBe(0);
@@ -178,6 +197,13 @@ describe("search_archive: posts", () => {
     const r = search({ kind: "posts" });
     expect(r.total).toBe(4);
     expect(r.items.map((i) => (i as { title: string }).title)).toEqual(["OS 공지", "강의자료 3주차", "중간고사 안내", "날짜 없음"]);
+  });
+
+  it("등록일시가 같으면 글 번호를 숫자로 비교해 내림차순", () => {
+    db.upsertPost(post({ wrId: "9", title: "9번", postedAt: "2026-11-01T09:00:00+09:00" }), T);
+    db.upsertPost(post({ wrId: "10", title: "10번", postedAt: "2026-11-01T09:00:00+09:00" }), T);
+    const titles = search({ kind: "posts", limit: 2 }).items.map((i) => (i as { title: string }).title);
+    expect(titles).toEqual(["10번", "9번"]);
   });
 
   it("board·course·query 필터와 와일드카드 이스케이프", () => {

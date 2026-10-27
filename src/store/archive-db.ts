@@ -253,15 +253,27 @@ export class ArchiveDb {
     return row && { dueAt: row.due_at, extendedDueAt: row.extended_due_at, submitStatus: row.submit_status };
   }
 
-  /** report_seq로 강의를 찾는다(lecture_seq 생략 시). */
-  findAssignmentLecture(reportSeq: string): { lectureSeq: string; courseName: string; title: string } | undefined {
+  /** report_seq로 강의를 찾는다(lecture_seq 생략 시). 마감은 저장된 원래 값. */
+  findAssignmentLecture(
+    reportSeq: string,
+  ): { lectureSeq: string; courseName: string; title: string; dueAt: string | null; extendedDueAt: string | null } | undefined {
     const row = this.db
       .prepare(
-        `SELECT a.lecture_seq, c.course_name, a.title FROM assignments a
+        `SELECT a.lecture_seq, c.course_name, a.title, a.due_at, a.extended_due_at FROM assignments a
          JOIN courses c ON c.lecture_seq = a.lecture_seq WHERE a.report_seq = ?`,
       )
-      .get(reportSeq) as { lecture_seq: string; course_name: string; title: string } | undefined;
-    return row && { lectureSeq: row.lecture_seq, courseName: row.course_name, title: row.title };
+      .get(reportSeq) as
+      | { lecture_seq: string; course_name: string; title: string; due_at: string | null; extended_due_at: string | null }
+      | undefined;
+    return (
+      row && {
+        lectureSeq: row.lecture_seq,
+        courseName: row.course_name,
+        title: row.title,
+        dueAt: row.due_at,
+        extendedDueAt: row.extended_due_at,
+      }
+    );
   }
 
   /** 과제를 저장한다. 새로 생기면 "new", 내용이 바뀌면 "updated", 같으면 "same". */
@@ -359,15 +371,18 @@ export class ArchiveDb {
   /**
    * 소유자(과제·제출·게시글)의 첨부 목록을 맞춘다. 같은 위치에 같은 이름·링크면 다운로드 기록을 유지하고,
    * 바뀌었으면 다시 내려받도록 비운다. 사라진 위치의 행은 지운다(디스크 파일은 지우지 않는다).
+   * 추가·변경·삭제된 첨부가 있으면 true.
    */
-  replaceAttachments(ownerType: OwnerType, ownerKey: string, lectureSeq: string, list: AttachmentRef[]): void {
+  replaceAttachments(ownerType: OwnerType, ownerKey: string, lectureSeq: string, list: AttachmentRef[]): boolean {
     const existing = this.db
       .prepare("SELECT position, name, url FROM attachments WHERE owner_type = ? AND owner_key = ?")
       .all(ownerType, ownerKey) as { position: number; name: string; url: string }[];
     const byPos = new Map(existing.map((r) => [r.position, r]));
+    let changed = false;
     list.forEach((att, position) => {
       const prev = byPos.get(position);
       if (prev && prev.name === att.name && prev.url === att.url) return;
+      changed = true;
       this.db
         .prepare(
           `INSERT INTO attachments (owner_type, owner_key, lecture_seq, position, name, url)
@@ -377,9 +392,10 @@ export class ArchiveDb {
         )
         .run(ownerType, ownerKey, lectureSeq, position, att.name, att.url);
     });
-    this.db
+    const removed = this.db
       .prepare("DELETE FROM attachments WHERE owner_type = ? AND owner_key = ? AND position >= ?")
       .run(ownerType, ownerKey, list.length);
+    return changed || Number(removed.changes) > 0;
   }
 
   /** 아직 내려받지 않은 첨부. */
@@ -452,7 +468,10 @@ export class ArchiveDb {
 
   /** 과제 검색. 마감(연장기한 우선) 오름차순, 마감 없음은 뒤. total은 limit 적용 전 건수. */
   searchAssignments(f: AssignmentSearchFilter): { total: number; items: AssignmentHit[] } {
-    const due = "COALESCE(a.extended_due_at, a.due_at)";
+    // DB에는 원래 마감을 둔다. 필터·정렬은 실제 마감(00:00 → 전날 23:59, `effectiveDeadline`) 기준이다.
+    const raw = "COALESCE(a.extended_due_at, a.due_at)";
+    const due = `(CASE WHEN substr(${raw}, 11) = 'T00:00:00+09:00'
+      THEN strftime('%Y-%m-%dT23:59:00+09:00', substr(${raw}, 1, 10), '-1 day') ELSE ${raw} END)`;
     const where: string[] = [];
     const params: string[] = [];
     if (f.course) {
@@ -547,7 +566,7 @@ export class ArchiveDb {
       .prepare(
         `SELECT p.lecture_seq, c.course_name, p.board, p.wr_id, p.title, p.posted_at, p.author, p.body_text
          ${from} ${clause}
-         ORDER BY (p.posted_at IS NULL), p.posted_at DESC, p.wr_id DESC LIMIT ?`,
+         ORDER BY (p.posted_at IS NULL), p.posted_at DESC, CAST(p.wr_id AS INTEGER) DESC LIMIT ?`,
       )
       .all(...params, f.limit) as {
       lecture_seq: string;

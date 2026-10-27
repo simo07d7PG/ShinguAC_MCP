@@ -325,7 +325,11 @@ describe("search_archive", () => {
   });
 
   it("잘못된 날짜·limit은 거부", async () => {
-    expect((await call("search_archive", { due_from: "2026-13-40" })).isError).toBe(true);
+    for (const due_from of ["2026-13-40", "2026-00-10", "2026-02-30"]) {
+      const res = await call("search_archive", { due_from });
+      expect(res.isError).toBe(true);
+      expect((res.content[0] as { text: string }).text).toContain("존재하지 않는 날짜입니다.");
+    }
     expect((await call("search_archive", { limit: 101 })).isError).toBe(true);
     expect(service.searchArchive).not.toHaveBeenCalled();
   });

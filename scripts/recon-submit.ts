@@ -32,10 +32,10 @@ for (const [label, page, seq] of [
   ["registerModal", "registerModal", openSeq],
   ["editModal", "editModal", doneSeq],
 ] as const) {
-  const detail = await session.request((c) => c.get(`${PORTAL_ORIGIN}/eclass/clas/room/homework/homeworkDetail?reportSeq=${seq}`));
+  const detail = await session.request((c) => c.get(`${PORTAL_ORIGIN}/eclass/clas/room/homework/homeworkDetail?reportSeq=${seq}`), { lectureScoped: true });
   const reportNm = cheerio.load(detail.text)("input[name=reportNm]").attr("value") ?? "";
   const q = new URLSearchParams({ reportSeq: seq, reportNm });
-  const res = await session.request((c) => c.get(`${PORTAL_ORIGIN}/eclass/clas/room/homework/${page}?${q}`));
+  const res = await session.request((c) => c.get(`${PORTAL_ORIGIN}/eclass/clas/room/homework/${page}?${q}`), { lectureScoped: true });
   writeFileSync(`tests/fixtures/raw/submit/${page}_${seq}.html`, res.text);
   writeFileSync(`tests/fixtures/raw/submit/detail_${seq}.html`, detail.text);
   describe(label, res.text);

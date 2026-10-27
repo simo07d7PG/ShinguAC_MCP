@@ -170,7 +170,8 @@ export class CategoryService {
 
   /**
    * 과제: 1(E클래스 홈) + 과목당 2(진입·목록) + 상세 N.
-   * 상세(제출 상태)는 마감이 [now, now+dueWithinDays](미지정 14일) 안인 과제만 조회하고 나머지는 `unknown`.
+   * 상세(제출 상태)는 마감이 [now, now+dueWithinDays](미지정 14일) 안인 과제만 조회한다.
+   * 나머지는 아카이브 DB에 제출(`submitted`)로 저장돼 있으면 `submitted`, 아니면 `unknown`.
    * 반환은 dueWithinDays 지정 시 그 범위만(강의 색인은 필터 전 전체로 갱신).
    */
   async getAssignments(opts: { dueWithinDays?: number } = {}): Promise<Result<Assignment[]>> {
@@ -191,15 +192,14 @@ export class CategoryService {
             details.set(row.reportSeq, await fetchHomeworkDetail(this.session, row.reportSeq));
           }
         }
-        // 상세를 읽지 않은 과제는 아카이브 DB에 저장된 상태가 있으면 그것을 쓴다(포털 요청 없음).
+        // 상세를 읽지 않은 과제는 아카이브 DB에 제출로 저장돼 있을 때만 그것을 쓴다(포털 요청 없음).
+        // 제출은 되돌릴 수 없지만 미제출·기간 아님은 저장 뒤에 바뀌었을 수 있어 사실로 보여 주지 않는다.
         all.push(
-          ...buildAssignments(lecture, rows, details, this.now()).map((a) => {
-            if (a.submitStatus !== "unknown") return a;
-            const stored = this.archiveDb?.getAssignmentState(a.reportSeq)?.submitStatus;
-            return stored === "submitted" || stored === "not_submitted" || stored === "not_open"
-              ? { ...a, submitStatus: stored as Assignment["submitStatus"] }
-              : a;
-          }),
+          ...buildAssignments(lecture, rows, details, this.now()).map((a) =>
+            a.submitStatus === "unknown" && this.archiveDb?.getAssignmentState(a.reportSeq)?.submitStatus === "submitted"
+              ? { ...a, submitStatus: "submitted" as const }
+              : a,
+          ),
         );
       }
       return all;
@@ -294,9 +294,20 @@ export class CategoryService {
       const html = await fetchHomeworkDetailHtml(this.session, reportSeq);
       const detail = parseHomeworkDetail(html);
       // 마감이 지나면 버튼이 사라져 제출했어도 not_open으로 보인다 → editModal 1회로 판정(archive-sync와 같은 함수).
-      if (detail.submitStatus === "not_open" && needsSubmitProbe(detail.submitStatus, detail.extendedDueAt ?? detail.dueAt, this.now())) {
-        const form = await fetchSubmissionForm(this.session, html, reportSeq);
-        if (form && judgeSubmission(form, detail.submitStatus)) detail.submitStatus = "submitted";
+      // 상세에 마감이 없으면 archive-sync처럼 목록에서 알던 마감을 쓴다.
+      // `not_open` 조건: needsSubmitProbe는 `submitted`에도 true(아카이브가 제출 내용을 읽으려고)지만,
+      // 여기서는 이미 제출로 확정된 과제에 editModal을 더 읽을 이유가 없다.
+      const deadline = detail.extendedDueAt ?? detail.dueAt ?? known?.extendedDueAt ?? known?.dueAt ?? null;
+      if (detail.submitStatus === "not_open" && needsSubmitProbe(detail.submitStatus, deadline, this.now())) {
+        try {
+          const form = await fetchSubmissionForm(this.session, html, reportSeq);
+          if (form && judgeSubmission(form, detail.submitStatus)) detail.submitStatus = "submitted";
+        } catch (err) {
+          // 판정 보조 요청이므로 네트워크·서버 오류면 not_open으로 두고 상세는 그대로 돌려준다.
+          // 자격증명·설정처럼 사용자가 조치해야 하는 오류만 그대로 던진다.
+          if (typeof (err as { userAction?: unknown } | null)?.userAction === "string") throw err;
+          this.logger.warn(`과제 ${reportSeq} 제출 판정 실패`, errorSummary(err));
+        }
       }
       return detail;
     });
@@ -545,7 +556,11 @@ export class CategoryService {
   private async resolveLecture(
     rawReportSeq: string,
     rawLectureSeq?: string,
-  ): Promise<{ reportSeq: string; lectureSeq: string; known?: { lectureSeq: string; courseName: string } }> {
+  ): Promise<{
+    reportSeq: string;
+    lectureSeq: string;
+    known?: { lectureSeq: string; courseName: string; dueAt?: string | null; extendedDueAt?: string | null };
+  }> {
     const reportSeq = rawReportSeq.trim();
     if (!/^\d+$/.test(reportSeq)) throw new Error(`report_seq는 숫자여야 합니다: ${reportSeq}`);
     const known = this.knownAssignments.get(reportSeq) ?? this.archiveDb?.findAssignmentLecture(reportSeq);

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as cheerio from "cheerio";
@@ -337,6 +337,14 @@ describe("ArchiveSync 게시글 재확인(R9)", () => {
     expect(reread.some((w) => old.includes(w))).toBe(false);
     expect(res.courses.find((c) => c.lectureSeq === "27962")!.materials.updated).toBe(5);
   });
+  it("첨부만 바뀐 글도 updated로 센다", async () => {
+    const service = makeService();
+    await service.syncArchive({ downloadFiles: false });
+    materialDetail = materialDetail.replaceAll("file_key=MASKED", "file_key=CHANGED");
+    const res = await service.syncArchive({ downloadFiles: false });
+    expect(res.courses.find((c) => c.lectureSeq === "27962")!.materials).toEqual({ total: 10, new: 0, updated: 10 });
+    expect(db.all("SELECT COUNT(*) AS n FROM attachments WHERE url LIKE '%CHANGED%'")).not.toEqual([{ n: 0 }]);
+  });
 });
 
 describe("ArchiveSync 취소·진행률(R6)", () => {
@@ -384,7 +392,7 @@ describe("ArchiveSync 취소·진행률(R6)", () => {
     expect(requests).toEqual([]);
   });
 
-  it("진행률은 하나의 누적 카운터: progress는 줄지 않고 total ≥ progress, 끝나면 progress = total", async () => {
+  it("진행률은 하나의 누적 카운터: progress는 알림마다 늘고 total ≥ progress, 끝나면 progress = total", async () => {
     const events: Array<{ progress: number; total: number; message: string }> = [];
     const res = await makeService().syncArchive({ onProgress: (p) => events.push(p) });
     expect(res.cancelled).toBeUndefined();
@@ -392,7 +400,7 @@ describe("ArchiveSync 취소·진행률(R6)", () => {
     for (let i = 0; i < events.length; i++) {
       expect(events[i]!.total).toBeGreaterThanOrEqual(events[i]!.progress);
       if (i > 0) {
-        expect(events[i]!.progress).toBeGreaterThanOrEqual(events[i - 1]!.progress);
+        expect(events[i]!.progress).toBeGreaterThan(events[i - 1]!.progress);
         expect(events[i]!.total).toBeGreaterThanOrEqual(events[i - 1]!.total);
       }
     }
@@ -402,14 +410,19 @@ describe("ArchiveSync 취소·진행률(R6)", () => {
     expect(last).toMatchObject({ progress: 4 + atts, total: 4 + atts });
   });
 
-  it("시작할 때 이전 다운로드가 남긴 임시 파일만 지운다(이름이 .part로 끝나는 정상 첨부는 유지)", async () => {
+  it("시작할 때 이전 다운로드가 남긴 오래된 임시 파일만 지운다(최근 임시 파일·.part로 끝나는 정상 첨부는 유지)", async () => {
     const dir = join(root, "files", "27962_UI화면설계", "materials", "1");
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, "a.pdf.123.0a1b2c3d.part"), "x");
+    const old = new Date(Date.now() - 11 * 60 * 1000);
+    await utimes(join(dir, "a.pdf.123.0a1b2c3d.part"), old, old);
+    // 다른 인스턴스가 내려받는 중일 수 있는 최근 임시 파일
+    await writeFile(join(dir, "b.pdf.456.0a1b2c3e.part"), "w");
     await writeFile(join(dir, "keep.pdf"), "y");
     await writeFile(join(dir, "data.part"), "z");
     await makeService().syncArchive({ downloadFiles: false });
     expect(existsSync(join(dir, "a.pdf.123.0a1b2c3d.part"))).toBe(false);
+    expect(existsSync(join(dir, "b.pdf.456.0a1b2c3e.part"))).toBe(true);
     expect(existsSync(join(dir, "keep.pdf"))).toBe(true);
     expect(existsSync(join(dir, "data.part"))).toBe(true);
   });

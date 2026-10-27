@@ -1,4 +1,5 @@
 import type { SessionManager } from "../auth/session-manager.js";
+import type { HttpClient, HttpResponse } from "../http/http-client.js";
 import { parseHomeworkDetail, parseHomeworkList, type HomeworkDetail, type HomeworkRow } from "../parsers/assignments.js";
 import { parseProfessorIntro, parseSyllabus, type ProfessorIntro, type Syllabus } from "../parsers/courses.js";
 import { parseEclassHome, type EclassLecture } from "../parsers/eclass.js";
@@ -22,30 +23,34 @@ export async function fetchEclassHome(session: SessionManager, term: AcademicTer
   return parseEclassHome(res.text);
 }
 
+/** 강의 진입 POST. `enterLecture`와 재로그인 뒤 재진입(`SessionManager`)이 같이 쓴다. */
+export function postLectureEntry(client: HttpClient, lectureSeq: string): Promise<HttpResponse> {
+  return client.postForm(`${CLAS}/home`, { lectureSeq, redirect: "" });
+}
+
 /** 강의실 진입 — 1요청. 이후 `/eclass/clas/...` 요청은 이 강의 기준이다. */
 export async function enterLecture(session: SessionManager, lectureSeq: string): Promise<void> {
-  await session.request((c) => c.postForm(`${CLAS}/home`, { lectureSeq, redirect: "" }), { skipLectureRestore: true });
-  session.setCurrentLecture(lectureSeq);
+  await session.request((c) => postLectureEntry(c, lectureSeq), { enterLecture: lectureSeq });
 }
 
 export async function fetchHomeworkList(session: SessionManager): Promise<HomeworkRow[]> {
-  const res = await session.request((c) => c.get(`${CLAS}/room/homework/homeworkList`));
+  const res = await session.request((c) => c.get(`${CLAS}/room/homework/homeworkList`), { lectureScoped: true });
   return parseHomeworkList(res.text);
 }
 
 export async function fetchHomeworkDetail(session: SessionManager, reportSeq: string): Promise<HomeworkDetail> {
   const q = new URLSearchParams({ reportSeq });
-  const res = await session.request((c) => c.get(`${CLAS}/room/homework/homeworkDetail?${q}`));
+  const res = await session.request((c) => c.get(`${CLAS}/room/homework/homeworkDetail?${q}`), { lectureScoped: true });
   return parseHomeworkDetail(res.text);
 }
 
 export async function fetchProfessorIntro(session: SessionManager): Promise<ProfessorIntro> {
-  const res = await session.request((c) => c.get(`${CLAS}/info/intro/introView`));
+  const res = await session.request((c) => c.get(`${CLAS}/info/intro/introView`), { lectureScoped: true });
   return parseProfessorIntro(res.text);
 }
 
 export async function fetchSyllabus(session: SessionManager): Promise<Syllabus> {
-  const res = await session.request((c) => c.get(`${CLAS}/info/plan/planView`));
+  const res = await session.request((c) => c.get(`${CLAS}/info/plan/planView`), { lectureScoped: true });
   return parseSyllabus(res.text);
 }
 
@@ -55,7 +60,7 @@ export async function fetchEclassBoardList(
   lecture: Pick<EclassLecture, "lectureSeq" | "courseName">,
 ): Promise<NoticeSummary[]> {
   const q = new URLSearchParams({ boardId });
-  const res = await session.request((c) => c.get(`${CLAS}/board/list?${q}`));
+  const res = await session.request((c) => c.get(`${CLAS}/board/list?${q}`), { lectureScoped: true });
   return parseEclassBoardList(res.text, { lectureSeq: lecture.lectureSeq, boardId, courseName: lecture.courseName });
 }
 
@@ -75,7 +80,7 @@ export async function fetchEclassBoardAll(
   let total = 0;
   for (let page = 1; page <= MAX_BOARD_PAGES; page++) {
     const q = new URLSearchParams({ boardId, pageIndex: String(page) });
-    const res = await session.request((c) => c.get(`${CLAS}/board/list?${q}`));
+    const res = await session.request((c) => c.get(`${CLAS}/board/list?${q}`), { lectureScoped: true });
     const pageRows = parseEclassBoardList(res.text, { lectureSeq: lecture.lectureSeq, boardId, courseName: lecture.courseName });
     const paging = parseBoardPaging(res.text);
     if (page === 1) total = paging.total;
@@ -88,7 +93,7 @@ export async function fetchEclassBoardAll(
 /** 게시글 원문(본문 HTML·작성자 포함) — 1요청. `enterLecture` 뒤에 호출한다. */
 export async function fetchEclassBoardPost(session: SessionManager, boardId: string, wrId: string): Promise<EclassBoardPost> {
   const q = new URLSearchParams({ boardId, wrId });
-  const res = await session.request((c) => c.get(`${CLAS}/board/detail?${q}`));
+  const res = await session.request((c) => c.get(`${CLAS}/board/detail?${q}`), { lectureScoped: true });
   return parseEclassBoardPost(res.text);
 }
 
@@ -100,6 +105,6 @@ export async function fetchEclassBoardDetail(
   summary: NoticeSummary,
 ): Promise<NoticeDetail> {
   const q = new URLSearchParams({ boardId, wrId });
-  const res = await session.request((c) => c.get(`${CLAS}/board/detail?${q}`));
+  const res = await session.request((c) => c.get(`${CLAS}/board/detail?${q}`), { lectureScoped: true });
   return parseEclassBoardDetail(res.text, summary);
 }

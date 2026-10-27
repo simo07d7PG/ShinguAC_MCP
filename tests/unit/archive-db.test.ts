@@ -37,7 +37,7 @@ describe("ArchiveDb", () => {
       extendedDueAt: null,
       submitStatus: "submitted",
     });
-    expect(db.findAssignmentLecture("10")).toEqual({ lectureSeq: "1", courseName: "자료구조", title: "과제 1" });
+    expect(db.findAssignmentLecture("10")).toMatchObject({ lectureSeq: "1", courseName: "자료구조", title: "과제 1" });
     expect(db.findAssignmentLecture("99")).toBeUndefined();
   });
 
@@ -63,7 +63,8 @@ describe("ArchiveDb", () => {
   it("첨부 맞추기: 같은 것은 다운로드 기록 유지, 바뀐 것은 다시 받기, 사라진 것은 삭제", () => {
     const a = { name: "a.pdf", url: "https://cec.shingu.ac.kr/x?file_key=a" };
     const b = { name: "b.pdf", url: "https://cec.shingu.ac.kr/x?file_key=b" };
-    db.replaceAttachments("post", "1:material:001", "1", [a, b]);
+    expect(db.replaceAttachments("post", "1:material:001", "1", [a, b])).toBe(true);
+    expect(db.replaceAttachments("post", "1:material:001", "1", [a, b])).toBe(false);
     const [first, second] = db.pendingAttachments();
     expect(first).toMatchObject({ ownerType: "post", ownerKey: "1:material:001", courseName: "자료구조", name: "a.pdf" });
     db.markDownloaded(first!.id, { localPath: "c/a.pdf", size: 3, sha256: "s1", downloadedAt: T });
@@ -77,9 +78,9 @@ describe("ArchiveDb", () => {
 
     // a는 그대로, 두 번째 자리는 c로 바뀜 → a 기록 유지, c는 미다운로드
     const c = { name: "c.pdf", url: "https://cec.shingu.ac.kr/x?file_key=c" };
-    db.replaceAttachments("post", "1:material:001", "1", [a, c]);
+    expect(db.replaceAttachments("post", "1:material:001", "1", [a, c])).toBe(true);
     expect(db.pendingAttachments().map((p) => p.name)).toEqual(["c.pdf"]);
-    db.replaceAttachments("post", "1:material:001", "1", [a]);
+    expect(db.replaceAttachments("post", "1:material:001", "1", [a])).toBe(true); // 삭제만 있어도 변경
     expect(db.all("SELECT name, local_path FROM attachments ORDER BY position")).toEqual([{ name: "a.pdf", local_path: "c/a.pdf" }]);
   });
 

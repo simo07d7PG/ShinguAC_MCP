@@ -307,6 +307,39 @@ describe("CategoryService.getAssignments (아카이브 상태)", () => {
       db.close();
     }
   });
+
+  it("저장된 미제출·기간 아님은 쓰지 않는다(저장 뒤에 바뀌었을 수 있음)", async () => {
+    const plain = await makeService().service.getAssignments();
+    const targets = plain.data.filter((a) => a.submitStatus === "unknown").slice(0, 2);
+    expect(targets).toHaveLength(2);
+    const db = new ArchiveDb(join(root, "eclass.db"));
+    try {
+      targets.forEach((t, i) => {
+        db.upsertCourse({ lectureSeq: t.lectureSeq, courseName: t.courseName, year: 2026, semester: "2" }, "2026-10-26T12:00:00+09:00");
+        db.upsertAssignment(
+          {
+            reportSeq: t.reportSeq,
+            lectureSeq: t.lectureSeq,
+            title: t.title,
+            startAt: null,
+            dueAt: t.dueAt,
+            extendedDueAt: t.extendedDueAt,
+            penaltyNote: null,
+            contentHtml: "",
+            contentText: "",
+            submitStatus: i === 0 ? "not_submitted" : "not_open",
+          },
+          "2026-10-26T12:00:00+09:00",
+        );
+      });
+      const res = await makeService(NOW, db).service.getAssignments();
+      for (const t of targets) {
+        expect(res.data.find((a) => a.reportSeq === t.reportSeq)?.submitStatus).toBe("unknown");
+      }
+    } finally {
+      db.close();
+    }
+  });
 });
 
 describe("CategoryService.getAssignment", () => {
@@ -371,6 +404,52 @@ describe("CategoryService.getAssignment", () => {
       ROUTES[EDIT] = modalRoute("<html><body>없음</body></html>");
       const res = await call(LATER);
       expect(res.data.submitStatus).toBe("not_open");
+    });
+
+    it("editModal 요청이 네트워크 오류면 not_open을 유지하고 상세는 돌려준다", async () => {
+      ROUTES[EDIT] = () => html("eclass/homework-edit-modal.html");
+      offline = (key) => key === EDIT;
+      const res = await call(LATER);
+      expect(res.data.submitStatus).toBe("not_open");
+      expect(res.data.title).toBeTruthy();
+      expect(editCount()).toBeGreaterThanOrEqual(1);
+    });
+
+    it("상세에 마감이 없으면 알던 마감(아카이브 DB)으로 판정한다", async () => {
+      ROUTES[EDIT] = () => html("eclass/homework-edit-modal.html");
+      ROUTES[DETAIL] = () =>
+        new Response(fixture("eclass/homework-detail-not-open.html").replaceAll('data-role="date"', 'data-role="none"'), {
+          status: 200,
+          headers: { "content-type": "text/html;charset=UTF-8" },
+        });
+      // 알던 마감이 없으면 판정하지 않는다.
+      expect((await call(LATER)).data.submitStatus).toBe("not_open");
+      expect(editCount()).toBe(0);
+
+      const db = new ArchiveDb(join(root, "eclass.db"));
+      try {
+        db.upsertCourse({ lectureSeq: "27962", courseName: "UI화면설계", year: 2026, semester: "2" }, "2026-10-26T12:00:00+09:00");
+        db.upsertAssignment(
+          {
+            reportSeq: "34771",
+            lectureSeq: "27962",
+            title: "과제",
+            startAt: null,
+            dueAt: "2026-10-28T00:00:00+09:00",
+            extendedDueAt: null,
+            penaltyNote: null,
+            contentHtml: "",
+            contentText: "",
+            submitStatus: "not_open",
+          },
+          "2026-10-26T12:00:00+09:00",
+        );
+        const res = await makeService(LATER, db).service.getAssignment({ reportSeq: "34771", lectureSeq: "27962" });
+        expect(res.data.submitStatus).toBe("submitted");
+        expect(editCount()).toBe(1);
+      } finally {
+        db.close();
+      }
     });
 
     it("마감 전(제출 시작 전)이면 editModal을 읽지 않는다", async () => {

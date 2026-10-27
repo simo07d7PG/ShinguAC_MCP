@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readdir, rm } from "node:fs/promises";
+import { mkdir, readdir, rm, stat } from "node:fs/promises";
 import { dirname, join, posix, resolve, sep } from "node:path";
 import type { SessionManager } from "../auth/session-manager.js";
 import { ConfigError } from "../config/config.js";
@@ -24,6 +24,8 @@ import { nowKst } from "../util/time.js";
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** 증분 동기화에서도 다시 읽는 게시글의 등록일 범위(일). 수정은 게시 직후에 몰린다고 본다. */
 export const POST_RECHECK_DAYS = 14;
+/** 시작할 때 지우는 다운로드 임시 파일의 최소 경과 시간. */
+const PART_FILE_GRACE_MS = 10 * 60 * 1000;
 
 type Logger = Pick<typeof defaultLogger, "debug" | "info" | "warn">;
 
@@ -78,11 +80,13 @@ export interface SyncSummary {
 class ProgressCounter {
   private progress = 0;
   private total = 0;
+  private reported = false;
   constructor(private readonly onProgress?: (p: SyncProgress) => void) {}
 
+  /** 총량만 늘린다. 진행률이 그대로인 알림은 보내지 않는다(첫 알림만 예외 — 진행률은 매번 증가해야 한다). */
   addTotal(n: number, message: string): void {
     this.total += n;
-    this.report(message);
+    if (!this.reported) this.report(message);
   }
 
   step(message: string): void {
@@ -92,6 +96,7 @@ class ProgressCounter {
   }
 
   private report(message: string): void {
+    this.reported = true;
     this.onProgress?.({ progress: this.progress, total: this.total, message });
   }
 }
@@ -237,8 +242,19 @@ export class ArchiveSync {
     } catch {
       return;
     }
+    // 최근에 바뀐 임시 파일은 다른 서버 인스턴스가 내려받는 중일 수 있어 남긴다(실제 시계 기준 — 파일 mtime과 비교).
+    const cutoff = Date.now() - PART_FILE_GRACE_MS;
     await Promise.all(
-      entries.filter((f) => DOWNLOAD_TEMP_RE.test(f)).map((f) => rm(join(this.filesDir, f), { force: true }).catch(() => {})),
+      entries
+        .filter((f) => DOWNLOAD_TEMP_RE.test(f))
+        .map(async (f) => {
+          const path = join(this.filesDir, f);
+          try {
+            if ((await stat(path)).mtimeMs <= cutoff) await rm(path, { force: true });
+          } catch {
+            // 그새 사라졌거나 지울 수 없으면 그대로 둔다.
+          }
+        }),
     );
   }
 
@@ -332,8 +348,9 @@ export class ArchiveSync {
           },
           fetchedAt,
         );
-        this.db.replaceAttachments("assignment", row.reportSeq, lecture.lectureSeq, d.attachments);
-        return r;
+        const attChanged = this.db.replaceAttachments("assignment", row.reportSeq, lecture.lectureSeq, d.attachments);
+        // 첨부만 바뀐 경우도 갱신으로 센다.
+        return r === "same" && attChanged ? "updated" : r;
       });
       if (res !== "same") summary.assignments[res]++;
 
@@ -353,8 +370,8 @@ export class ArchiveSync {
           },
           nowKst(this.now()),
         );
-        this.db.replaceAttachments("submission", row.reportSeq, lecture.lectureSeq, attachments);
-        return r;
+        const attChanged = this.db.replaceAttachments("submission", row.reportSeq, lecture.lectureSeq, attachments);
+        return r === "same" && attChanged ? "updated" : r;
       });
       if (sub !== "same") summary.submissions[sub]++;
     }
@@ -381,8 +398,9 @@ export class ArchiveSync {
             },
             nowKst(this.now()),
           );
-          this.db.replaceAttachments("post", `${lecture.lectureSeq}:${board}:${wrId}`, lecture.lectureSeq, post.attachments);
-          return r;
+          const ownerKey = `${lecture.lectureSeq}:${board}:${wrId}`;
+          const attChanged = this.db.replaceAttachments("post", ownerKey, lecture.lectureSeq, post.attachments);
+          return r === "same" && attChanged ? "updated" : r;
         });
         if (res !== "same") counts[res]++;
       }

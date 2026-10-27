@@ -8,7 +8,11 @@ import { run, SOURCE_NOTE } from "./result.js";
 const KstDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD 형식이어야 합니다.")
-  .refine((s) => new Date(`${s}T00:00:00Z`).toISOString().startsWith(s), "존재하지 않는 날짜입니다.");
+  .refine((s) => {
+    // 13월·00월처럼 아예 해석되지 않는 날짜는 Invalid Date라 toISOString()이 RangeError를 던진다.
+    const d = new Date(`${s}T00:00:00Z`);
+    return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(s);
+  }, "존재하지 않는 날짜입니다.");
 
 export function registerSearchArchive(server: McpServer, getService: GetService): void {
   server.registerTool(

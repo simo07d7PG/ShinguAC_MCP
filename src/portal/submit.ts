@@ -23,7 +23,7 @@ export type SubmitKind = "register" | "edit";
 /** 상세 화면 원문 — 1요청. `enterLecture` 뒤에 호출한다. */
 export async function fetchHomeworkDetailHtml(session: SessionManager, reportSeq: string): Promise<string> {
   const q = new URLSearchParams({ reportSeq });
-  return (await session.request((c) => c.get(`${HOMEWORK}/homeworkDetail?${q}`))).text;
+  return (await session.request((c) => c.get(`${HOMEWORK}/homeworkDetail?${q}`), { lectureScoped: true })).text;
 }
 
 /** 제출 폼 — 1요청. 신규는 `registerModal`, 다시 제출은 `editModal`(기존 제목·본문·첨부 키 포함). */
@@ -36,6 +36,7 @@ export async function fetchSubmitForm(
   const q = new URLSearchParams({ reportSeq, reportNm });
   const res = await session.request((c) =>
     c.get(`${HOMEWORK}/${kind}Modal?${q}`, { headers: { Accept: "text/html;", "X-Requested-With": "XMLHttpRequest" } }),
+    { lectureScoped: true },
   );
   return parseSubmitForm(res.text, kind === "register" ? "registerForm" : "updateForm");
 }
@@ -118,6 +119,7 @@ export async function postReportSubmit(
   const action = kind === "register" ? "insertReportSubmit" : "updateReportSubmit";
   const res = await session.request((c) => c.postForm(`${HOMEWORK}/${action}`, fields, { retries: 0 }), {
     resend: false,
+    lectureScoped: true,
   });
   return res.text;
 }
