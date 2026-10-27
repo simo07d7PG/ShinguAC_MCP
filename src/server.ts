@@ -3,7 +3,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SessionManager } from "./auth/session-manager.js";
 import { loadConfig } from "./config/config.js";
 import { HttpClient } from "./http/http-client.js";
+import { logger } from "./log/logger.js";
+import { redact } from "./log/redact.js";
 import { CategoryService } from "./service/category-service.js";
+import { ArchiveDb } from "./store/archive-db.js";
 
 import { registerAllTools, type ToolService } from "./tools/index.js";
 
@@ -16,7 +19,15 @@ function createDefaultService(): CategoryService {
   const config = loadConfig();
   const client = new HttpClient();
   const session = new SessionManager({ client, loadConfig: () => config });
-  return new CategoryService({ session, client });
+  // 아카이브 DB를 못 열어도(잠김·권한) 조회·제출 도구는 동작하게 하고 sync_eclass만 실패시킨다.
+  try {
+    const archive = { db: new ArchiveDb(config.dbPath), dbPath: config.dbPath, filesDir: config.filesDir };
+    return new CategoryService({ session, client, archive });
+  } catch (err) {
+    const why = redact(err instanceof Error ? err.message : String(err));
+    logger.warn("E클래스 아카이브 DB를 열지 못했습니다", why);
+    return new CategoryService({ session, client, archiveError: `E클래스 아카이브 DB(${config.dbPath})를 열지 못했습니다: ${why}` });
+  }
 }
 
 /**

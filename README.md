@@ -9,6 +9,7 @@
 - 수강 과목과 담당 교수 (교수 연락처는 옵션)
 - 공지: 대학 / 장학 / 수업공지(E클래스) 목록과 본문
 - 성적 / 이수학점
+- E클래스 아카이브: 이번 학기 과제방·수업공지·자료실 게시물과 내 제출을 로컬 SQLite에 저장하고 첨부파일을 내려받기(`sync_eclass`)
 
 범위 밖:
 
@@ -19,7 +20,7 @@
 
 ## 요구사항
 
-- Node.js 20 이상
+- Node.js 22.13 이상 (내장 `node:sqlite` 사용)
 - 신구대학교 학생 계정 (학번 / 비밀번호). 교직원 계정은 지원하지 않습니다.
 
 ## 설치
@@ -106,6 +107,7 @@ Windows에서는 `C:\Users\<사용자>\.shingu-mcp\config.json`입니다.
 | `get_notices` | `category`(`univ`/`scholarship`/`eclass`), `limit`(1~100, 기본 20), `include_eclass`(기본 false) | 공지 목록 (최신순) | 약 0.4초 |
 | `get_notice` | `id`: `get_notices` 결과의 id | 공지 본문, 첨부파일 목록 | 약 0.7초 |
 | `get_grades` | `semester`(선택, `YYYY-H` 예: `2026-1`) | 학기별 성적, 이수구분별 학점, 이번 학기 과목별 성적 | 약 1.5초 |
+| `sync_eclass` | `download_files`(선택, 기본 true), `full`(선택, 기본 false: 증분) | 과목별 과제·제출·수업공지·자료실 신규/갱신 건수, 첨부 다운로드 수, DB·파일 경로 | 첫 실행 수 분(첨부 크기에 따라), 이후 증분 |
 | `submit_assignment` | `report_seq`·`title`·`content`(필수), `lecture_seq`·`file_path`(절대 경로, 1개)·`confirm_token`(선택) | 토큰 없이 호출하면 미리보기(대상 과제, 마감·연장 감점, 덮어쓰기 경고, 기존 첨부)와 `confirmToken`. 그 토큰을 넣어 다시 호출하면 제출하고, 포털을 다시 읽어 `verified`로 반영 여부를 표시 | 미리보기 약 2초 |
 
 소요 시간은 실계정 실측값이며 네트워크와 수강 과목 수에 따라 달라집니다. `include_eclass`를 켜면 과목당 포털 요청이 2회 늘어납니다.
@@ -133,8 +135,47 @@ Windows에서는 `C:\Users\<사용자>\.shingu-mcp\config.json`입니다.
 
 - 도구가 호출될 때만 포털에 로그인(SSO)하고 요청합니다. 백그라운드 폴링은 없습니다.
 - 포털 요청은 순차로 보내며 간격 200ms, 타임아웃 15초, 재시도 1회입니다. 과제 제출·첨부 업로드 요청은 재시도하지 않습니다(업로드 타임아웃 120초).
-- 조회 결과는 저장하지 않습니다. 포털 장애 시 조회 도구는 오류를 반환합니다.
+- `get_*` 조회 결과는 저장하지 않습니다. 포털 장애 시 조회 도구는 오류를 반환합니다.
 - 이전 버전이 만든 `~/.shingu-mcp/snapshots/` 폴더는 더 이상 쓰지 않으니 직접 삭제해도 됩니다.
+
+### E클래스 아카이브 (`sync_eclass`)
+
+"E클래스 자료 동기화해줘"처럼 요청하면 이번 학기 E클래스 강의 중 과제나 게시글이 있는 강의만 읽어 저장합니다. 포털에는 쓰지 않습니다.
+
+- DB: `~/.shingu-mcp/eclass.db` (SQLite). 아무 SQLite 도구(`sqlite3`, DB Browser for SQLite 등)로 열 수 있습니다.
+- 첨부 파일: `~/.shingu-mcp/files/<lectureSeq>_<과목명>/<assignments|submissions|notices|materials>/<번호>/<파일명>`. 내용이 같은 파일은 한 번만 저장하고 DB에서 같은 경로를 가리킵니다.
+
+| 테이블 | 내용 |
+|---|---|
+| `courses` | 강의(`lecture_seq`, 과목명, 학년도·학기, 분반, 교수) |
+| `assignments` | 과제방: 과제명, 제출 시작·제출기한·연장기한, 연장 감점 안내, 과제 내용(`content_html`/`content_text`), 내 제출 상태 |
+| `submissions` | 내가 제출한 과제의 제목·내용(`content_html`/`content_text`) |
+| `posts` | 수업공지(`board='notice'`)·자료실(`board='material'`): 제목, 등록일시, 작성자, 본문 전체(`body_html`/`body_text`) |
+| `attachments` | 첨부(과제·내 제출·게시글 공통): 파일명, 원본 링크, 로컬 경로(`files` 기준), 크기, sha256 |
+
+예시 질의:
+
+```sql
+-- 마감 전인데 아직 안 낸 과제
+SELECT c.course_name, a.title, COALESCE(a.extended_due_at, a.due_at) AS deadline
+FROM assignments a JOIN courses c USING (lecture_seq)
+WHERE a.submit_status = 'not_submitted' AND deadline >= strftime('%Y-%m-%dT%H:%M:%S+09:00', 'now', '+9 hours')
+ORDER BY deadline;
+
+-- 자료실 글과 첨부 파일 위치
+SELECT p.title, p.posted_at, f.name, f.local_path
+FROM posts p LEFT JOIN attachments f ON f.owner_type = 'post' AND f.owner_key = p.lecture_seq || ':' || p.board || ':' || p.wr_id
+WHERE p.board = 'material' ORDER BY p.posted_at DESC;
+```
+
+동작:
+
+- 기본은 **증분**입니다. 이미 저장한 게시글과 마감(연장 포함)이 하루 이상 지난 과제는 다시 읽지 않습니다. 게시글 수정까지 반영하려면 `full: true`로 실행하세요.
+- 실측(2026-10-27, 강의 2개: 과제 31·게시글 28·첨부 47건 545MB): 첫 실행 목록·본문 저장 약 48초, 첨부 다운로드 약 5분(중복 제거 후 디스크 317MB). 이후 증분 실행은 수십 초입니다.
+- 첨부는 큐를 거쳐 하나씩 받으며, 한 건당 최대 10분을 기다립니다. 실패한 첨부는 다음 동기화에서 다시 받습니다. 첨부가 많으면 `download_files: false`로 먼저 목록만 저장하고 나중에 받아도 됩니다.
+- 자격증명 오류가 나면 동기화를 멈춥니다. 한 강의에서 난 다른 오류는 그 강의의 `error`에 적고 다음 강의로 넘어갑니다.
+
+**민감정보 경고:** DB와 `files/`에는 내가 제출한 과제 내용·파일이 **평문**으로 저장됩니다. 공용 PC에서 사용하지 말고 이 폴더를 공유·커밋하지 마세요. 첨부 원본 링크(`file_key`)는 로그인 없이도 파일을 받을 수 있는 값이므로 DB 파일도 함부로 공유하지 마세요.
 
 ## 주의사항
 
@@ -160,6 +201,6 @@ npm run check:pii    # 픽스처에 개인정보가 남아 있는지 검사
 ```
 
 - 테스트 픽스처: `tests/fixtures/README.md`
-- 실계정이 필요한 스크립트 `npm run recon:login`, `npm run smoke:service`, `npm run smoke`는 루트에 `.env`가 필요합니다. `.env.example`을 복사해 채우세요. `.env`는 커밋하지 않습니다.
+- 실계정이 필요한 스크립트 `npm run recon:login`, `npm run smoke:service`, `npm run smoke`, `npm run smoke:archive`는 루트에 `.env`가 필요합니다. `.env.example`을 복사해 채우세요. `.env`는 커밋하지 않습니다.
 - 포털 화면 정찰 결과: `docs/portal-pages.md`
 - 커밋 규칙: `COMMIT.md`

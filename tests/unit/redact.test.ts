@@ -23,6 +23,15 @@ describe("redact", () => {
     expect(redact("Set-Cookie: sid=zzz; Path=/")).toBe("Set-Cookie: ***");
   });
 
+  it("첨부 키(file_key·fileKey·fileMasterKey)를 마스킹한다", () => {
+    const out = redact(
+      "다운로드 실패: https://cec.shingu.ac.kr/01shingu/eClassDown.jsp?file_key=20261020-abc /file/download?fileKey=k1&x=1 fileMasterKey=m2",
+    );
+    expect(out).not.toMatch(/20261020-abc|k1|m2/);
+    expect(out).toContain("file_key=***");
+    expect(out).toContain("&x=1");
+  });
+
   it("jsessionid / access_token / refresh_token을 마스킹한다", () => {
     expect(redact("/a;jsessionid=ABC123?x=1")).not.toContain("ABC123");
     const out = redact("access_token=AAA&refresh_token=BBB");

@@ -2,7 +2,13 @@ import type { SessionManager } from "../auth/session-manager.js";
 import { parseHomeworkDetail, parseHomeworkList, type HomeworkDetail, type HomeworkRow } from "../parsers/assignments.js";
 import { parseProfessorIntro, parseSyllabus, type ProfessorIntro, type Syllabus } from "../parsers/courses.js";
 import { parseEclassHome, type EclassLecture } from "../parsers/eclass.js";
-import { parseEclassBoardDetail, parseEclassBoardList } from "../parsers/notices.js";
+import {
+  parseBoardPaging,
+  parseEclassBoardDetail,
+  parseEclassBoardList,
+  parseEclassBoardPost,
+  type EclassBoardPost,
+} from "../parsers/notices.js";
 import type { NoticeDetail, NoticeSummary } from "../schema/index.js";
 import type { AcademicTerm } from "./semester.js";
 import { PORTAL_ORIGIN } from "./urls.js";
@@ -50,6 +56,33 @@ export async function fetchEclassBoardList(
   const q = new URLSearchParams({ boardId });
   const res = await session.request((c) => c.get(`${CLAS}/board/list?${q}`));
   return parseEclassBoardList(res.text, { lectureSeq: lecture.lectureSeq, boardId, courseName: lecture.courseName });
+}
+
+/** 안전장치: 게시판 하나에서 따라갈 최대 페이지 수(페이지당 10건). */
+const MAX_BOARD_PAGES = 50;
+
+/** 게시판 목록 전체 페이지 — 페이지 수만큼 요청(페이지당 10건). `enterLecture` 뒤에 호출한다. */
+export async function fetchEclassBoardAll(
+  session: SessionManager,
+  boardId: string,
+  lecture: Pick<EclassLecture, "lectureSeq" | "courseName">,
+): Promise<NoticeSummary[]> {
+  const all: NoticeSummary[] = [];
+  for (let page = 1; page <= MAX_BOARD_PAGES; page++) {
+    const q = new URLSearchParams({ boardId, pageIndex: String(page) });
+    const res = await session.request((c) => c.get(`${CLAS}/board/list?${q}`));
+    const rows = parseEclassBoardList(res.text, { lectureSeq: lecture.lectureSeq, boardId, courseName: lecture.courseName });
+    all.push(...rows);
+    if (rows.length === 0 || page >= parseBoardPaging(res.text).pages) break;
+  }
+  return all;
+}
+
+/** 게시글 원문(본문 HTML·작성자 포함) — 1요청. `enterLecture` 뒤에 호출한다. */
+export async function fetchEclassBoardPost(session: SessionManager, boardId: string, wrId: string): Promise<EclassBoardPost> {
+  const q = new URLSearchParams({ boardId, wrId });
+  const res = await session.request((c) => c.get(`${CLAS}/board/detail?${q}`));
+  return parseEclassBoardPost(res.text);
 }
 
 /** 게시판 본문 — 1요청. `enterLecture`로 해당 강의에 들어간 뒤 호출한다. */

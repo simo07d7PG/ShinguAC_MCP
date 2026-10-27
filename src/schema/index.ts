@@ -1,3 +1,4 @@
+export * from "./archive.js";
 export * from "./assignment.js";
 export * from "./course.js";
 export * from "./grade.js";

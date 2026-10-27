@@ -24,7 +24,8 @@ const get = (url: string): Promise<HttpResponse> => session.request((c) => c.get
 function headers(label: string, res: HttpResponse): void {
   const h = res.headers;
   console.log(`  [${label}] status=${res.status} type=${h.get("content-type")} len=${h.get("content-length")} ` +
-    `disp=${JSON.stringify(h.get("content-disposition"))} final=${new URL(res.finalUrl).pathname} hops=${res.redirectChain.length}`);
+    // 파일명에 학번·이름이 들어 있을 수 있어 형식만 출력한다.
+    `disp=${(h.get("content-disposition") ?? "-").replace(/(filename\*?=)[^;]*/gi, "$1…")} final=${new URL(res.finalUrl).pathname} hops=${res.redirectChain.length}`);
 }
 
 /** 첨부·파일 관련 요소를 속성만 출력한다(텍스트는 길이만). */

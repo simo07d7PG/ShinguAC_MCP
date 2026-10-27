@@ -50,8 +50,10 @@ import type {
   SubmitResult,
   TimetableEntry,
 } from "../schema/index.js";
+import type { ArchiveDb } from "../store/archive-db.js";
 import { Mutex } from "../util/mutex.js";
 import { nowKst } from "../util/time.js";
+import { ArchiveSync, type SyncOptions, type SyncSummary } from "./archive-sync.js";
 import { loadUploadFile, PORTAL_WIDGET_MAX_BYTES } from "./upload-file.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -63,6 +65,10 @@ export interface CategoryServiceOptions {
   session: SessionManager;
   /** 로그인 불필요 요청(공개 CMS 공지)에 쓰는 클라이언트. 보통 session과 같은 HttpClient. */
   client: HttpClient;
+  /** E클래스 아카이브(sync_eclass). 없으면 syncArchive가 실패하고 lecture_seq 조회는 메모리만 쓴다. */
+  archive?: { db: ArchiveDb; dbPath: string; filesDir: string };
+  /** archive를 만들지 못한 이유(syncArchive 오류 메시지). */
+  archiveError?: string;
   now?: () => Date;
   logger?: Logger;
 }
@@ -117,8 +123,11 @@ export class CategoryService {
   private readonly eclassLock = new Mutex();
   /** 미리보기 토큰 서명 키. 프로세스마다 새로 만들어, 모델이 토큰을 지어낼 수 없게 한다. */
   private readonly previewSecret = randomBytes(32);
-  /** 마지막 get_assignments 결과(reportSeq → 과제). lecture_seq 생략 시 강의를 찾는 데 쓴다. */
+  /** 마지막 get_assignments 결과(reportSeq → 과제). lecture_seq 생략 시 강의를 찾는 데 쓴다(없으면 아카이브 DB). */
   private readonly knownAssignments = new Map<string, Assignment>();
+  private readonly archiveDb?: ArchiveDb;
+  private readonly archive?: ArchiveSync;
+  private readonly archiveError?: string;
   /** 마지막 get_notices 결과(id → 요약). 공지 본문 화면에 없는 제목·게시일을 채우는 데 쓴다. */
   private readonly knownNotices = new Map<string, NoticeSummary>();
 
@@ -127,6 +136,24 @@ export class CategoryService {
     this.client = options.client;
     this.now = options.now ?? (() => new Date());
     this.logger = options.logger ?? defaultLogger;
+    this.archiveError = options.archiveError;
+    if (options.archive) {
+      this.archiveDb = options.archive.db;
+      this.archive = new ArchiveSync({
+        session: this.session,
+        client: this.client,
+        ...options.archive,
+        eclassLock: this.eclassLock,
+        now: this.now,
+        logger: this.logger,
+      });
+    }
+  }
+
+  /** E클래스 아카이브 동기화(과제방·수업공지·자료실 → SQLite + 첨부 파일). */
+  async syncArchive(opts: SyncOptions = {}): Promise<SyncSummary> {
+    if (!this.archive) throw new Error(this.archiveError ?? "E클래스 아카이브 저장소가 설정되지 않았습니다.");
+    return this.archive.sync(opts);
   }
 
   /**
@@ -484,16 +511,16 @@ export class CategoryService {
   }
 
   /**
-   * reportSeq·lectureSeq 검증. lectureSeq가 없으면 마지막 get_assignments 결과에서 찾는다.
+   * reportSeq·lectureSeq 검증. lectureSeq가 없으면 마지막 get_assignments 결과, 없으면 아카이브 DB에서 찾는다.
    * 둘 다 있는데 그 결과의 강의와 다르면 거부한다(다른 과목 맥락으로 요청하지 않도록).
    */
   private async resolveLecture(
     rawReportSeq: string,
     rawLectureSeq?: string,
-  ): Promise<{ reportSeq: string; lectureSeq: string; known?: Assignment }> {
+  ): Promise<{ reportSeq: string; lectureSeq: string; known?: { lectureSeq: string; courseName: string } }> {
     const reportSeq = rawReportSeq.trim();
     if (!/^\d+$/.test(reportSeq)) throw new Error(`report_seq는 숫자여야 합니다: ${reportSeq}`);
-    const known = this.knownAssignments.get(reportSeq);
+    const known = this.knownAssignments.get(reportSeq) ?? this.archiveDb?.findAssignmentLecture(reportSeq);
     const given = rawLectureSeq?.trim();
     if (given && known && known.lectureSeq !== given) {
       throw new Error(

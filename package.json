@@ -4,7 +4,7 @@
   "description": "신구대학교 학생종합포털 MCP 서버",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "bin": {
     "shingu-mcp": "dist/index.js"
@@ -20,7 +20,9 @@
     "recon:login": "tsx --env-file=.env scripts/recon-login.ts",
     "smoke:service": "tsx --env-file=.env scripts/smoke-service.ts",
     "smoke:submit-preview": "tsx --env-file=.env scripts/smoke-submit-preview.ts",
-    "recon:submit": "tsx --env-file=.env scripts/recon-submit.ts"
+    "recon:submit": "tsx --env-file=.env scripts/recon-submit.ts",
+    "recon:archive": "tsx --env-file=.env scripts/recon-archive.ts",
+    "smoke:archive": "tsx --env-file=.env scripts/smoke-archive.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",

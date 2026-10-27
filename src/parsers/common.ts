@@ -60,3 +60,9 @@ export function htmlToText($: $, $root: Cheerio<AnyNode>): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
+
+/** HTML 조각 문자열 → 줄바꿈을 보존한 일반 텍스트. */
+export function fragmentToText(html: string): string {
+  const $ = cheerio.load(`<div id="__root">${html}</div>`);
+  return htmlToText($, $("#__root"));
+}

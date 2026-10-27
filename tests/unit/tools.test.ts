@@ -66,6 +66,25 @@ function mockService(): { [K in keyof ToolService]: ReturnType<typeof vi.fn> } {
       warnings: [],
       message: "미리보기",
     })),
+    syncArchive: vi.fn(async () => ({
+      term: "2026-2",
+      syncedAt: LIVE.fetchedAt,
+      courses: [
+        {
+          lectureSeq: "1",
+          courseName: "자료구조",
+          assignments: { total: 3, new: 3, updated: 0 },
+          submissions: { new: 1, updated: 0 },
+          notices: { total: 2, new: 2, updated: 0 },
+          materials: { total: 0, new: 0, updated: 0 },
+        },
+      ],
+      skippedEmptyCourses: 1,
+      files: { downloaded: 2, reused: 0, failed: 0, pending: 0 },
+      warnings: [],
+      dbPath: "/h/.shingu-mcp/eclass.db",
+      filesDir: "/h/.shingu-mcp/files",
+    })),
   };
 }
 
@@ -110,10 +129,11 @@ const TOOL_NAMES = [
   "get_notices",
   "get_timetable",
   "submit_assignment",
+  "sync_eclass",
 ];
 
 describe("tools/list", () => {
-  it("8개 도구와 입력·출력 스키마, 출처 표기를 노출한다", async () => {
+  it("9개 도구와 입력·출력 스키마, 출처 표기를 노출한다", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(TOOL_NAMES);
     for (const t of tools) {
@@ -252,6 +272,17 @@ describe("조회 도구", () => {
   });
 });
 
+
+describe("sync_eclass", () => {
+  it("download_files·full을 전달하고 요약을 반환한다", async () => {
+    const out = structured(await call("sync_eclass", { download_files: false, full: true }));
+    expect(service.syncArchive).toHaveBeenLastCalledWith({ downloadFiles: false, full: true });
+    expect(out["term"]).toBe("2026-2");
+    expect((out["files"] as { downloaded: number }).downloaded).toBe(2);
+    await call("sync_eclass");
+    expect(service.syncArchive).toHaveBeenLastCalledWith({ downloadFiles: undefined, full: undefined });
+  });
+});
 
 describe("오류", () => {
   it("AuthRejectedError → isError + 설정 안내", async () => {

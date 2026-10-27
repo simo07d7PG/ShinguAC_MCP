@@ -10,6 +10,10 @@ export interface Config {
   password: Secret;
   /** `<home>/.shingu-mcp` */
   homeDir: string;
+  /** E클래스 아카이브 DB `<homeDir>/eclass.db` */
+  dbPath: string;
+  /** 내려받은 첨부 `<homeDir>/files` */
+  filesDir: string;
 }
 
 export class ConfigError extends Error {
@@ -39,13 +43,14 @@ export function shinguHomeDir(): string {
 export function loadConfig(): Config {
   const homeDir = shinguHomeDir();
   const configPath = join(homeDir, "config.json");
+  const paths = { homeDir, dbPath: join(homeDir, "eclass.db"), filesDir: join(homeDir, "files") };
 
   const envId = process.env["SHINGU_ID"];
   const envPw = process.env["SHINGU_PW"];
 
   if (envId && envPw) {
     registerSecret(envPw);
-    return { id: envId, password: new Secret(envPw), homeDir };
+    return { id: envId, password: new Secret(envPw), ...paths };
   }
   if (envId || envPw) {
     const missing = envId ? "SHINGU_PW" : "SHINGU_ID";
@@ -78,5 +83,5 @@ export function loadConfig(): Config {
   }
 
   registerSecret(parsed.data.password);
-  return { id: parsed.data.id, password: new Secret(parsed.data.password), homeDir };
+  return { id: parsed.data.id, password: new Secret(parsed.data.password), ...paths };
 }

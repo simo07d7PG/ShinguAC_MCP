@@ -1,12 +1,21 @@
+import { createHash } from "node:crypto";
+import { createWriteStream } from "node:fs";
+import { rename, rm } from "node:fs/promises";
+import { Readable, Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { PortalCookieJar } from "./cookie-jar.js";
 import { decodeBody } from "./decode.js";
 import { HostNotAllowedError, HttpStatusError, NetworkError } from "./errors.js";
 import { requestQueue, type EnqueueOptions, type RequestQueue } from "../queue/request-queue.js";
 
-export const DEFAULT_ALLOWED_HOSTS = ["student.shingu.ac.kr", "login.shingu.ac.kr", "www.shingu.ac.kr"];
+/** cec.shingu.ac.kr: E클래스 첨부 다운로드(`eClassDown.jsp`). */
+export const DEFAULT_ALLOWED_HOSTS = ["student.shingu.ac.kr", "login.shingu.ac.kr", "www.shingu.ac.kr", "cec.shingu.ac.kr"];
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 const MAX_REDIRECTS = 10;
+/** 첨부 다운로드 한 건의 제한 시간. 실측 56MB가 21초(docs/portal-pages.md §3.4). */
+export const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000;
 
 export interface HttpClientOptions {
   fetch?: typeof fetch;
@@ -21,6 +30,12 @@ export interface RequestOptions extends EnqueueOptions {
 }
 
 type Body = string | FormData | undefined;
+
+export interface DownloadResult {
+  size: number;
+  sha256: string;
+  headers: Headers;
+}
 
 export interface RedirectHop {
   url: string;
@@ -79,6 +94,70 @@ export class HttpClient {
   /** multipart/form-data. Content-Type(boundary)은 fetch가 정한다. */
   postMultipart(url: string, form: FormData, options: RequestOptions = {}): Promise<HttpResponse> {
     return this.request("POST", url, form, options.headers ?? {}, options);
+  }
+
+  /**
+   * GET 응답 본문을 `dest`에 스트리밍으로 저장한다(임시 파일 → rename). 큐를 거치며 리다이렉트도 허용 호스트만 따른다.
+   * Content-Length와 받은 크기가 다르면 실패로 본다. 기본 제한 시간은 DOWNLOAD_TIMEOUT_MS.
+   */
+  async download(startUrl: string, dest: string, options: RequestOptions = {}): Promise<DownloadResult> {
+    const queueOptions: EnqueueOptions = { ...options, timeoutMs: options.timeoutMs ?? DOWNLOAD_TIMEOUT_MS };
+    const tmp = `${dest}.part`;
+    let url = this.assertAllowed(startUrl);
+    try {
+      for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+        const out = await this.queue.enqueue(async (signal) => {
+          const cookie = await this.jar.headerFor(url);
+          const reqHeaders: Record<string, string> = {
+            "User-Agent": USER_AGENT,
+            ...options.headers,
+            ...(cookie ? { Cookie: cookie } : {}),
+          };
+          try {
+            const res = await this.fetchFn(url, { method: "GET", headers: reqHeaders, redirect: "manual", signal });
+            await this.jar.storeFromResponse(url, res.headers.getSetCookie());
+            const location = res.headers.get("location");
+            if (res.status >= 300 && res.status < 400 && location) {
+              await res.body?.cancel();
+              return { location };
+            }
+            if (res.status >= 400) {
+              await res.body?.cancel();
+              throw new HttpStatusError(res.status, url);
+            }
+            const hash = createHash("sha256");
+            let size = 0;
+            const meter = new Transform({
+              transform(chunk: Buffer, _enc, cb) {
+                hash.update(chunk);
+                size += chunk.length;
+                cb(null, chunk);
+              },
+            });
+            const body = res.body ? Readable.fromWeb(res.body as WebReadableStream) : Readable.from([]);
+            await pipeline(body, meter, createWriteStream(tmp));
+            const expected = res.headers.get("content-length");
+            if (expected !== null && Number(expected) !== size) {
+              throw new NetworkError(`다운로드 크기 불일치(${size}/${expected}바이트): ${url}`);
+            }
+            return { result: { size, sha256: hash.digest("hex"), headers: res.headers } };
+          } catch (err) {
+            if (err instanceof HttpStatusError || err instanceof NetworkError) throw err;
+            throw new NetworkError(`다운로드 실패: ${url}`, { cause: err });
+          }
+        }, queueOptions);
+        if (out.result) {
+          await rename(tmp, dest);
+          return out.result;
+        }
+        url = this.assertAllowed(new URL(out.location!, url).href);
+        this.logger?.debug("redirect", url);
+      }
+      throw new NetworkError(`리다이렉트가 ${MAX_REDIRECTS}회를 초과했습니다: ${startUrl}`);
+    } catch (err) {
+      await rm(tmp, { force: true });
+      throw err;
+    }
   }
 
   private assertAllowed(url: string): string {
