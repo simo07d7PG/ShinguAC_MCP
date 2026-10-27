@@ -9,10 +9,13 @@
 | AC | 방법 | 명령 |
 |---|---|---|
 | E1 | Claude Code에 MCP 등록 후 새 세션에서 "이번 주 과제 뭐 있어?" | `.mcp.json`(로컬) + `~/.shingu-mcp/config.json` → `claude` |
-| E2 | 빌드된 서버를 stdio로 띄워 7개 도구 순차 호출 + 전체 단위/통합 테스트 | `npm run build && npm run smoke`, `npm test` |
+| E2 | 빌드된 서버를 stdio로 띄워 도구 순차 호출 + 전체 단위/통합 테스트 | `npm run build && npm run smoke`, `npm test` |
 | E3 | 큐 단위 테스트(순차·간격·타임아웃·재시도) + 실측 요청 로그 | `npx vitest run tests/unit/request-queue.test.ts` |
 | E4 | ~~실패하는 fetch를 주입해 스냅샷 fallback 확인~~ (2026-10-27 스냅샷·fallback 제거로 폐기) | ~~`npm run smoke:stale`~~ |
 | E5 | README 3요소, 커밋 메시지 규칙, 금지 경로·PII 미추적 | `npm run check:pii`, `git ls-files`, `git log` |
+| E6 | 실계정으로 `sync_eclass` 실행(첫/증분) | MCP로 `sync_eclass` 호출 |
+| E7 | 동기화 후 `search_archive`로 조회(계획) | MCP로 `search_archive` 호출 |
+| E8 | `submit_assignment` 미리보기 → 승인 → 실제 제출 | `docs/submit-verification-plan.md` |
 
 ## 실행 기록
 
@@ -42,6 +45,28 @@
 - [x] `git log --format=%B | grep -Ei 'claude|anthropic|generated with'` → 0건. 모든 제목 `[Type] 한국어` 형식.
 - [x] `git ls-files`에 `.env`, `dist/`, `node_modules/`, `tests/fixtures/raw/`, `.mcp.json` 없음.
 - [x] `npm run check:pii` 통과. `git log -p --all`에 `.env`의 학번·비밀번호 값 0건. 추적 파일에 학생 실명 0건.
+
+## 2026-10-27 추가 항목
+
+### AC-E6 — `sync_eclass` (E클래스 아카이브 동기화)
+- [x] 실제 `~/.shingu-mcp`(DB `eclass.db` + `files/`) 첫 동기화 **170.5초**: 강의 2개 읽음(다른 2개는 과제·게시글이 없어 건너뜀), 과제 31, 내 제출 10, 수업공지 2, 자료실 26, 첨부 56(받음 45 + sha256 중복 재사용 11), 실패 0, 디스크 325MB.
+- [x] 증분 실행(재실행)은 이미 받은 첨부와 끝난 과제를 다시 읽지 않아 첫 실행보다 훨씬 빠르다(정확한 시간은 미측정).
+- 이전 측정(임시 디렉터리): 다운로드 없이 47.7초, 다운로드 포함 약 300초 — 후자는 마감 지난 제출 판정 수정(a4b3540) 전 값이다.
+- [x] 단위 테스트로 증분·실패 격리·다운로드 검증 확인(`tests/unit/`). 포털에는 쓰지 않는다(읽기 전용).
+- 알려진 한계: 오래 걸리는 동기화는 진행률 알림·취소가 없다(후속 작업 R6에서 추가 예정). 클라이언트 타임아웃 설정에 주의.
+
+### AC-E7 — 아카이브 조회 (`search_archive`, 계획)
+- [ ] `sync_eclass`로 채운 DB를 포털 요청 없이 조회한다. 첫 실행 뒤 확인할 것:
+  - [ ] `kind: assignments` — 과목·제목·마감·내 제출 여부(`submitted`/`not_submitted`/`not_open`), 마감 오름차순.
+  - [ ] `kind: posts` + `board: notice`/`material` — 등록일시 내림차순.
+  - [ ] `course`·`query`·`due_from/due_to`·`limit` 필터가 기대대로 동작(특수문자 `%`·`_` 포함 검색 포함).
+  - [ ] 첨부는 로컬 절대 경로와 받았는지 여부만 나오고 원본 URL(file_key)은 나오지 않는다.
+  - [ ] DB가 없거나 비어 있으면 "먼저 sync_eclass를 실행하세요" 안내와 빈 결과.
+  - [ ] 소요(포털 요청 0건이라 즉시 응답 기대) 기록.
+
+### AC-E8 — 과제 제출 (`submit_assignment`)
+- [x] 미리보기(`confirm_token` 없음)는 실측했다(`npm run smoke:submit-preview`). 실제 제출은 **미실시**.
+- [ ] 첫 실제 제출 검증: 절차와 확인 항목은 `docs/submit-verification-plan.md`. 결과는 여기에 기록한다.
 
 ## 알려진 한계
 - 과제 제출 상태는 상세 페이지를 열어야 알 수 있어 마감 임박 과제 수에 비례해 시간이 늘어난다(과제 1건당 약 0.7초).
