@@ -1,0 +1,71 @@
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Cache-control" content="no-cache">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="신구대학교 학생종합포털">
+<meta name="author" content="SHINGU">
+<link rel="icon" href="/resources/custom/images/main/shingu-symbol.ico"><head>
+    
+</head>
+<body>
+<meta name="decorator" content="/WEB-INF/view/cmm/template/blank/template.jsp" />
+<script src="/resources/tinymce/4.2.6/tinymce.min.js"></script>
+<script type="text/javascript">
+	$(document).ready(function(){
+		$.poizn.editor({});
+		$("div[data-role=fileUploader]").fileUploader();
+	});
+</script>
+<form name="updateForm" method="post">
+	<input type="hidden" name="reportSeq" id="reportSeq" value="34757" />
+	<input type="hidden" name="studentNo" id="studentNo" value="2000000000" />
+	<div class="table-responsive">
+		<table class="table table-list th-center table-rwd-info">
+			<colgroup>
+				<col width="20%">
+				<col class="hidden-xs" width="80%">
+			</colgroup>
+			<tbody>
+				<tr>
+					<th scope="col">과제명</th>
+					<td data-cell-header="과제명">
+						8주차 수업 중 실습 ] figma 3D logo 제작</td>
+				</tr>
+				<tr>
+					<th scope="col">과제제목<span class="text-red">*</span></th>
+					<td data-cell-header="과제제목">
+						<input type="text" id="reportTitle" name="reportTitle" class="form-control" value='2000000000 홍길동_8주차' />
+					</td>
+				</tr>
+				<tr>
+					<th scope="col">과제내용<span class="text-red">*</span></th>
+					<td data-cell-header="과제내용">
+						<textarea class="form-control" id="reportContent" name="reportContent" data-role="tinymce"
+							data-file-key
+							data-file-master-key
+							data-file-section="boardContent"
+							data-file-access-type="PUBLIC"
+							data-max-file-count="1"
+							data-prefix="boardContent"
+						><p>기존 제출 본문</p></textarea>
+					</td>
+				</tr>
+				<tr>
+					<th scope="col">파일첨부</th>
+					<td data-cell-header="파일첨부">
+						<div data-role="fileUploader"
+							data-file-key
+							data-file-master-key="20260101000000-00000000000000000000000000000000"
+							data-file-section="submitAttach"
+							data-file-access-type="PUBLIC"
+							data-prefix="submitAttach"
+							data-max-file-count="1"
+						></div>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+</form>
+</body>

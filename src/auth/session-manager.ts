@@ -1,6 +1,6 @@
 import { loadConfig as defaultLoadConfig, type Config } from "../config/config.js";
 import type { HttpClient, HttpResponse } from "../http/http-client.js";
-import { AuthRejectedError, SessionExpiredError } from "./errors.js";
+import { AuthRejectedError, SessionExpiredError, WriteSessionLostError } from "./errors.js";
 import { isSessionExpired, login as defaultLogin } from "./sso-flow.js";
 
 export interface SessionManagerOptions {
@@ -29,7 +29,14 @@ export class SessionManager {
     this.generation++;
   }
 
-  async request(fn: (client: HttpClient) => Promise<HttpResponse>): Promise<HttpResponse> {
+  /**
+   * 로그인 보장 후 요청. 세션 만료 응답이면 재로그인해 한 번 더 보낸다.
+   * `resend: false`(제출 같은 비멱등 쓰기)면 다시 보내지 않고 `WriteSessionLostError`를 던진다.
+   */
+  async request(
+    fn: (client: HttpClient) => Promise<HttpResponse>,
+    options: { resend?: boolean } = {},
+  ): Promise<HttpResponse> {
     await this.ensureLoggedIn();
     const gen = this.generation;
     const first = await fn(this.client);
@@ -37,6 +44,7 @@ export class SessionManager {
 
     // 동시 호출이 함께 만료를 만난 경우 한 번만 무효화한다.
     if (this.generation === gen) this.invalidate();
+    if (options.resend === false) throw new WriteSessionLostError();
     await this.ensureLoggedIn();
     const second = await fn(this.client);
     if (isSessionExpired(second)) throw new SessionExpiredError();

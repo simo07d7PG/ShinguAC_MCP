@@ -43,6 +43,28 @@ describe("RequestQueue", () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
+  it("retries: 0이면 전송 실패해도 재시도하지 않는다(제출 POST용)", async () => {
+    const q = new RequestQueue();
+    const fn = vi.fn(() => new Promise<never>(() => {}));
+    const result = q.enqueue(fn, { retries: 0 }).catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(15_000 + 200 + 15_000);
+    expect(await result).toBeInstanceOf(TimeoutError);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("timeoutMs로 요청별 타임아웃을 늘린다(업로드용)", async () => {
+    const q = new RequestQueue();
+    let settled = false;
+    const result = q
+      .enqueue(() => new Promise<never>(() => {}), { retries: 0, timeoutMs: 60_000 })
+      .catch((e: unknown) => e)
+      .finally(() => (settled = true));
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(await result).toBeInstanceOf(TimeoutError);
+  });
+
   it("5xx 후 200: 성공, 2회 호출", async () => {
     const q = new RequestQueue();
     const fn = vi

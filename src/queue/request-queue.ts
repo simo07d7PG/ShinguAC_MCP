@@ -8,6 +8,12 @@ export interface RequestQueueOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
+/** 요청별 재정의. 제출처럼 멱등이 아닌 요청은 `retries: 0`으로 중복 전송을 막는다. */
+export interface EnqueueOptions {
+  retries?: number;
+  timeoutMs?: number;
+}
+
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 function isRetryable(err: unknown): boolean {
@@ -33,19 +39,21 @@ export class RequestQueue {
     this.sleep = options.sleep ?? defaultSleep;
   }
 
-  enqueue<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
-    const run = this.tail.then(() => this.execute(fn));
+  enqueue<T>(fn: (signal: AbortSignal) => Promise<T>, options: EnqueueOptions = {}): Promise<T> {
+    const run = this.tail.then(() =>
+      this.execute(fn, options.retries ?? this.maxRetries, options.timeoutMs ?? this.timeoutMs),
+    );
     this.tail = run.catch(() => undefined);
     return run;
   }
 
-  private async execute<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  private async execute<T>(fn: (signal: AbortSignal) => Promise<T>, maxRetries: number, timeoutMs: number): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       await this.waitGap();
       try {
-        return await this.runOnce(fn);
+        return await this.runOnce(fn, timeoutMs);
       } catch (err) {
-        if (attempt < this.maxRetries && isRetryable(err)) continue;
+        if (attempt < maxRetries && isRetryable(err)) continue;
         throw err;
       } finally {
         this.lastFinishedAt = this.now();
@@ -59,14 +67,14 @@ export class RequestQueue {
     if (wait > 0) await this.sleep(wait);
   }
 
-  private async runOnce<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  private async runOnce<T>(fn: (signal: AbortSignal) => Promise<T>, timeoutMs: number): Promise<T> {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
         controller.abort();
-        reject(new TimeoutError(this.timeoutMs));
-      }, this.timeoutMs);
+        reject(new TimeoutError(timeoutMs));
+      }, timeoutMs);
     });
     try {
       return await Promise.race([fn(controller.signal), timeout]);

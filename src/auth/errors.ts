@@ -29,6 +29,15 @@ export class LoginFailedError extends AuthError {
   }
 }
 
+/** 쓰기 요청이 만료된 세션으로 나가 처리되지 않았다. 중복 위험 때문에 자동 재전송하지 않는다. */
+export class WriteSessionLostError extends AuthError {
+  readonly userAction = "제출 상태를 확인한 뒤 다시 시도해 주세요.";
+  constructor() {
+    super("포털 세션이 만료되어 요청이 처리되지 않았습니다(쓰기 요청은 자동으로 다시 보내지 않습니다).");
+    this.name = "WriteSessionLostError";
+  }
+}
+
 export class SessionExpiredError extends AuthError {
   readonly userAction = "잠시 후 다시 시도해 주세요. 계속되면 포털에서 로그아웃 상태인지 확인해 주세요.";
   constructor() {

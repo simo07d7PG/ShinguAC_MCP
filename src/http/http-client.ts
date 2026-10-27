@@ -1,7 +1,7 @@
 import { PortalCookieJar } from "./cookie-jar.js";
 import { decodeBody } from "./decode.js";
 import { HostNotAllowedError, HttpStatusError, NetworkError } from "./errors.js";
-import { requestQueue, type RequestQueue } from "../queue/request-queue.js";
+import { requestQueue, type EnqueueOptions, type RequestQueue } from "../queue/request-queue.js";
 
 export const DEFAULT_ALLOWED_HOSTS = ["student.shingu.ac.kr", "login.shingu.ac.kr", "www.shingu.ac.kr"];
 const USER_AGENT =
@@ -16,9 +16,11 @@ export interface HttpClientOptions {
   logger?: { debug(...args: unknown[]): void };
 }
 
-export interface RequestOptions {
+export interface RequestOptions extends EnqueueOptions {
   headers?: Record<string, string>;
 }
+
+type Body = string | FormData | undefined;
 
 export interface RedirectHop {
   url: string;
@@ -56,14 +58,27 @@ export class HttpClient {
   }
 
   get(url: string, options: RequestOptions = {}): Promise<HttpResponse> {
-    return this.request("GET", url, undefined, options.headers ?? {});
+    return this.request("GET", url, undefined, options.headers ?? {}, options);
   }
 
-  postForm(url: string, fields: Record<string, string>, options: RequestOptions = {}): Promise<HttpResponse> {
-    return this.request("POST", url, new URLSearchParams(fields).toString(), {
-      "Content-Type": "application/x-www-form-urlencoded",
-      ...options.headers,
-    });
+  /** 같은 이름의 필드가 여러 개일 수 있으면 `[name, value][]`로 넘긴다(폼 순서 유지). */
+  postForm(
+    url: string,
+    fields: Record<string, string> | Array<[string, string]>,
+    options: RequestOptions = {},
+  ): Promise<HttpResponse> {
+    return this.request(
+      "POST",
+      url,
+      new URLSearchParams(fields).toString(),
+      { "Content-Type": "application/x-www-form-urlencoded", ...options.headers },
+      options,
+    );
+  }
+
+  /** multipart/form-data. Content-Type(boundary)은 fetch가 정한다. */
+  postMultipart(url: string, form: FormData, options: RequestOptions = {}): Promise<HttpResponse> {
+    return this.request("POST", url, form, options.headers ?? {}, options);
   }
 
   private assertAllowed(url: string): string {
@@ -82,8 +97,9 @@ export class HttpClient {
   private async request(
     method: "GET" | "POST",
     startUrl: string,
-    body: string | undefined,
+    body: Body,
     headers: Record<string, string>,
+    queueOptions: EnqueueOptions,
   ): Promise<HttpResponse> {
     const redirectChain: RedirectHop[] = [];
     let url = this.assertAllowed(startUrl);
@@ -92,7 +108,7 @@ export class HttpClient {
     let curHeaders = headers;
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      const raw = await this.sendOnce(curMethod, url, curBody, curHeaders);
+      const raw = await this.sendOnce(curMethod, url, curBody, curHeaders, queueOptions);
       const location = raw.headers.get("location") ?? undefined;
       const isRedirect = raw.status >= 300 && raw.status < 400 && location !== undefined;
       redirectChain.push({ url, status: raw.status, ...(location !== undefined ? { location } : {}) });
@@ -124,8 +140,9 @@ export class HttpClient {
   private sendOnce(
     method: string,
     url: string,
-    body: string | undefined,
+    body: Body,
     headers: Record<string, string>,
+    queueOptions: EnqueueOptions,
   ): Promise<RawResponse> {
     return this.queue.enqueue(async (signal) => {
       const cookie = await this.jar.headerFor(url);
@@ -145,6 +162,6 @@ export class HttpClient {
       }
       if (res.status >= 400) throw new HttpStatusError(res.status, url);
       return { status: res.status, headers: res.headers, body: buf };
-    });
+    }, queueOptions);
   }
 }

@@ -8,6 +8,7 @@ import { registerGetNotice } from "./get-notice.js";
 import { registerGetNotices } from "./get-notices.js";
 import { registerGetTimetable } from "./get-timetable.js";
 import { registerRefreshSnapshots } from "./refresh-snapshots.js";
+import { registerSubmitAssignment } from "./submit-assignment.js";
 
 export type ToolService = Pick<
   CategoryService,
@@ -19,6 +20,7 @@ export type ToolService = Pick<
   | "getNotice"
   | "getGrades"
   | "refreshAll"
+  | "submitAssignment"
 >;
 
 /** 도구 호출 시점에 서비스를 얻는다. 설정이 없으면 ConfigError를 던진다. */
@@ -33,4 +35,5 @@ export function registerAllTools(server: McpServer, getService: GetService): voi
   registerGetNotice(server, getService);
   registerGetGrades(server, getService);
   registerRefreshSnapshots(server, getService);
+  registerSubmitAssignment(server, getService);
 }

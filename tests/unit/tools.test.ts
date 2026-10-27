@@ -54,6 +54,24 @@ function mockService(): { [K in keyof ToolService]: ReturnType<typeof vi.fn> } {
     getNotices: vi.fn(async () => ({ data: [notice], meta: STALE })),
     getNotice: vi.fn(async () => ({ data: detail, meta: LIVE })),
     getGrades: vi.fn(async () => ({ data: grades, meta: LIVE })),
+    submitAssignment: vi.fn(async () => ({
+      submitted: false,
+      mode: "register" as const,
+      lectureSeq: "1",
+      reportSeq: "10",
+      assignmentTitle: "과제 1",
+      dueAt: "2026-10-28T23:59:00+09:00",
+      extendedDueAt: null,
+      inExtension: false,
+      title: "제목",
+      contentLength: 2,
+      keepsExistingAttachment: false,
+      existingAttachments: [],
+      confirmToken: "1.x",
+      verified: false,
+      warnings: [],
+      message: "미리보기",
+    })),
     refreshAll: vi.fn(async () => [
       { category: "assignments", ok: true, fetchedAt: LIVE.fetchedAt },
       { category: "grades", ok: false, error: "NetworkError: x" },
@@ -102,10 +120,11 @@ const TOOL_NAMES = [
   "get_notices",
   "get_timetable",
   "refresh_snapshots",
+  "submit_assignment",
 ];
 
 describe("tools/list", () => {
-  it("8개 도구와 입력·출력 스키마, 출처 표기를 노출한다", async () => {
+  it("9개 도구와 입력·출력 스키마, 출처 표기를 노출한다", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(TOOL_NAMES);
     for (const t of tools) {
@@ -125,6 +144,48 @@ describe("tools/list", () => {
     ]);
     expect(byName["get_notice"]!.inputSchema.required).toEqual(["id"]);
     expect(Object.keys(byName["get_grades"]!.inputSchema.properties ?? {})).toEqual(["semester"]);
+    const submit = byName["submit_assignment"]!;
+    expect(submit.inputSchema.required?.slice().sort()).toEqual(["content", "report_seq", "title"]);
+    expect(submit.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+    expect(submit.description).toContain("confirm_token");
+    // 쓰기 도구는 submit_assignment 하나뿐이다.
+    for (const t of tools.filter((x) => x.name !== "submit_assignment")) {
+      expect(t.annotations?.destructiveHint).not.toBe(true);
+    }
+  });
+});
+
+describe("submit_assignment", () => {
+  it("snake_case 인자를 서비스 옵션으로 옮기고, confirm_token 생략 시 그대로 미리보기", async () => {
+    const res = await call("submit_assignment", { report_seq: "10", title: "제목", content: "본문" });
+    expect(res.isError).toBeFalsy();
+    expect(res.structuredContent).toMatchObject({ submitted: false });
+    expect(service.submitAssignment).toHaveBeenLastCalledWith({
+      reportSeq: "10",
+      lectureSeq: undefined,
+      title: "제목",
+      content: "본문",
+      filePath: undefined,
+      confirmToken: undefined,
+    });
+    await call("submit_assignment", {
+      report_seq: "10",
+      lecture_seq: "1",
+      title: "제목",
+      content: "본문",
+      file_path: "C:/a.pdf",
+      confirm_token: "1.x",
+    });
+    expect(service.submitAssignment).toHaveBeenLastCalledWith(
+      expect.objectContaining({ lectureSeq: "1", filePath: "C:/a.pdf", confirmToken: "1.x" }),
+    );
+  });
+
+  it("서비스 오류는 isError", async () => {
+    service.submitAssignment.mockRejectedValueOnce(new Error("과제 10는 지금 제출 기간이 아닙니다"));
+    const res = await call("submit_assignment", { report_seq: "10", title: "t", content: "c", confirm_token: "1.x" });
+    expect(res.isError).toBe(true);
+    expect((res.content[0] as { text: string }).text).toContain("제출 기간이 아닙니다");
   });
 });
 

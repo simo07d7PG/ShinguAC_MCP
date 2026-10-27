@@ -40,6 +40,8 @@
 | `eclass/homework-detail-not-submitted.html` | 과제 상세 | "과제제출" 버튼 = 미제출 |
 | `eclass/homework-detail-submitted.html` | 과제 상세 | "다시제출" 버튼 = 제출함 |
 | `eclass/homework-detail-not-open.html` | 과제 상세 | 버튼 없음 = 기간 아님 |
+| `eclass/homework-register-modal.html` | 과제 제출 폼(`registerModal`) | 신규, 학번 `2000000000` |
+| `eclass/homework-edit-modal.html` | 과제 다시 제출 폼(`editModal`) | 제목·본문·첨부 키를 가짜 값으로 치환 |
 | `eclass/intro-view.html` | 교수소개 | 소속/이메일/전화 |
 | `eclass/plan-view.html` | 수업계획서 | 연구실 포함 |
 | `eclass/board-list-notice.html` | 수업공지 목록 | |

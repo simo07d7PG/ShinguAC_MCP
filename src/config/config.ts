@@ -33,9 +33,13 @@ function guide(configPath: string): string {
   );
 }
 
+/** 자격증명·스냅샷 디렉터리(`<SHINGU_MCP_HOME 또는 홈>/.shingu-mcp`). */
+export function shinguHomeDir(): string {
+  return join(process.env["SHINGU_MCP_HOME"] || homedir(), ".shingu-mcp");
+}
+
 export function loadConfig(): Config {
-  const home = process.env["SHINGU_MCP_HOME"] || homedir();
-  const homeDir = join(home, ".shingu-mcp");
+  const homeDir = shinguHomeDir();
   const configPath = join(homeDir, "config.json");
   const snapshotsDir = join(homeDir, "snapshots");
 
