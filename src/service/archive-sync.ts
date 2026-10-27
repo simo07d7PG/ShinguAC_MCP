@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readdir, rm } from "node:fs/promises";
 import { dirname, join, posix, resolve, sep } from "node:path";
 import type { SessionManager } from "../auth/session-manager.js";
 import { ConfigError } from "../config/config.js";
+import { AbortError } from "../http/errors.js";
 import type { HttpClient } from "../http/http-client.js";
 import { logger as defaultLogger } from "../log/logger.js";
 import { redact } from "../log/redact.js";
@@ -21,6 +22,8 @@ import { Mutex } from "../util/mutex.js";
 import { nowKst } from "../util/time.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** 증분 동기화에서도 다시 읽는 게시글의 등록일 범위(일). 수정은 게시 직후에 몰린다고 본다. */
+export const POST_RECHECK_DAYS = 14;
 
 type Logger = Pick<typeof defaultLogger, "debug" | "info" | "warn">;
 
@@ -29,6 +32,16 @@ export interface SyncOptions {
   downloadFiles?: boolean;
   /** true면 이미 저장한 게시글·지난 과제도 다시 읽는다. 기본 false(증분). */
   full?: boolean;
+  /** abort되면 다음 경계(강의·과제·게시글·첨부 전)에서 멈추고 `cancelled: true` 요약을 돌려준다. 받던 첨부도 끊는다. */
+  signal?: AbortSignal;
+  /** 진행률. progress는 줄지 않고 total ≥ progress. total은 첨부 수를 알게 되면 늘어난다. */
+  onProgress?: (p: SyncProgress) => void;
+}
+
+export interface SyncProgress {
+  progress: number;
+  total: number;
+  message: string;
 }
 
 interface Counts {
@@ -57,6 +70,30 @@ export interface SyncSummary {
   warnings: string[];
   dbPath: string;
   filesDir: string;
+  /** 도중에 취소됐으면 true. 그때까지 저장한 것은 남는다. */
+  cancelled?: boolean;
+}
+
+/** 누적 진행률 하나. 단계마다 progress를 1 올리고, 새로 알게 된 작업만큼 total을 늘린다. */
+class ProgressCounter {
+  private progress = 0;
+  private total = 0;
+  constructor(private readonly onProgress?: (p: SyncProgress) => void) {}
+
+  addTotal(n: number, message: string): void {
+    this.total += n;
+    this.report(message);
+  }
+
+  step(message: string): void {
+    this.progress++;
+    this.total = Math.max(this.total, this.progress);
+    this.report(message);
+  }
+
+  private report(message: string): void {
+    this.onProgress?.({ progress: this.progress, total: this.total, message });
+  }
 }
 
 export interface ArchiveSyncOptions {
@@ -126,17 +163,31 @@ export class ArchiveSync {
       const term = currentAcademicTerm(this.now());
       const syncedAt = nowKst(this.now());
       const warnings: string[] = [];
-      const lectures = await this.eclassLock.run(() => fetchEclassHome(this.session, term));
+      const { signal } = opts;
+      const progress = new ProgressCounter(opts.onProgress);
+      await this.removePartFiles();
       const courses: CourseSyncSummary[] = [];
       let skippedEmptyCourses = 0;
+      let cancelled = signal?.aborted ?? false;
+      const lectures = cancelled ? [] : await this.eclassLock.run(() => fetchEclassHome(this.session, term));
+      progress.addTotal(lectures.length, `강의 ${lectures.length}개`);
       for (const lecture of lectures) {
+        if (signal?.aborted) {
+          cancelled = true;
+          break;
+        }
         try {
           const summary = await this.eclassLock.run(() =>
-            this.syncLecture(lecture, term, syncedAt, opts.full ?? false, warnings),
+            this.syncLecture(lecture, term, syncedAt, opts.full ?? false, warnings, signal),
           );
           if (summary) courses.push(summary);
           else skippedEmptyCourses++;
         } catch (err) {
+          // 취소는 과목 실패가 아니다. 그때까지 저장한 것은 그대로 두고 멈춘다.
+          if (err instanceof AbortError) {
+            cancelled = true;
+            break;
+          }
           if (isFatal(err)) throw err;
           this.logger.warn(`아카이브: ${lecture.courseName} 동기화 실패`, errorSummary(err));
           courses.push({
@@ -149,11 +200,21 @@ export class ArchiveSync {
             error: errorSummary(err),
           });
         }
+        progress.step(`${lecture.courseName} 완료`);
       }
-      const files =
-        opts.downloadFiles === false
-          ? { downloaded: 0, reused: 0, failed: 0, pending: this.db.pendingAttachments().length }
-          : await this.downloadPending(warnings);
+      let files: SyncSummary["files"];
+      if (cancelled || opts.downloadFiles === false) {
+        files = { downloaded: 0, reused: 0, failed: 0, pending: this.db.pendingAttachments().length };
+      } else {
+        const res = await this.downloadPending(warnings, signal, progress);
+        files = res.files;
+        cancelled = res.cancelled;
+      }
+      if (cancelled) {
+        this.logger.info(
+          `아카이브: 동기화 취소됨(강의 ${courses.length + skippedEmptyCourses}/${lectures.length}개, 첨부 ${files.downloaded + files.reused}개 처리)`,
+        );
+      }
       return {
         term: `${term.year}-${term.semester}`,
         syncedAt,
@@ -163,8 +224,22 @@ export class ArchiveSync {
         warnings,
         dbPath: this.dbPath,
         filesDir: this.filesDir,
+        ...(cancelled ? { cancelled: true } : {}),
       };
     });
+  }
+
+  /** 이전 동기화가 중단되며 남긴 임시 파일(`*.part`)을 지운다. 실패는 무시한다(다음 동기화에서 다시 시도). */
+  private async removePartFiles(): Promise<void> {
+    let entries: string[];
+    try {
+      entries = await readdir(this.filesDir, { recursive: true });
+    } catch {
+      return;
+    }
+    await Promise.all(
+      entries.filter((f) => f.endsWith(".part")).map((f) => rm(join(this.filesDir, f), { force: true }).catch(() => {})),
+    );
   }
 
   /** 강의 하나. 과제·게시글이 하나도 없으면 저장하지 않고 null. eclassLock 안에서 호출한다. */
@@ -174,7 +249,11 @@ export class ArchiveSync {
     syncedAt: string,
     full: boolean,
     warnings: string[],
+    signal: AbortSignal | undefined,
   ): Promise<CourseSyncSummary | null> {
+    const checkAbort = (): void => {
+      if (signal?.aborted) throw new AbortError();
+    };
     await enterLecture(this.session, lecture.lectureSeq);
     const homework = await fetchHomeworkList(this.session);
     const lists = {
@@ -213,6 +292,7 @@ export class ArchiveSync {
 
     for (const row of homework) {
       if (!full && !this.needsAssignmentRefresh(row)) continue;
+      checkAbort();
       const html = await fetchHomeworkDetailHtml(this.session, row.reportSeq);
       const d = parseHomeworkDetail(html);
       // 마감이 지나면 상세 화면에 제출 버튼이 모두 사라져 "기간 아님"으로 보이지만, 제출했다면 editModal에 내용이 남아 있다
@@ -284,7 +364,8 @@ export class ArchiveSync {
       for (const item of boards[board]) {
         const { wrId } = parseNoticeId(item.id);
         if (!wrId) continue;
-        if (!full && this.db.hasPost(lecture.lectureSeq, board, wrId)) continue;
+        if (!full && !this.needsPostRefresh(lecture.lectureSeq, board, wrId)) continue;
+        checkAbort();
         const post = await fetchEclassBoardPost(this.session, BOARD_IDS[board], wrId);
         const res = this.db.transaction(() => {
           const r = this.db.upsertPost(
@@ -326,16 +407,39 @@ export class ArchiveSync {
     return open(state.extendedDueAt ?? state.dueAt) || open(row.extendedDueAt ?? row.dueAt);
   }
 
-  /** DB에서 아직 받지 않은 첨부를 차례로 내려받는다. 실패한 것은 다음 동기화에서 다시 시도한다. */
-  private async downloadPending(warnings: string[]): Promise<SyncSummary["files"]> {
+  /**
+   * 증분 동기화에서 게시글 본문을 다시 읽을지. 처음 보는 글과 등록일시가 POST_RECHECK_DAYS일 이내인 글만 읽는다
+   * (바뀌지 않았으면 upsertPost가 "same"이라 갱신·재다운로드 없음). 등록일시를 모르는 저장 글은 다시 읽지 않는다.
+   */
+  private needsPostRefresh(lectureSeq: string, board: Board, wrId: string): boolean {
+    const postedAt = this.db.getPostPostedAt(lectureSeq, board, wrId);
+    if (postedAt === undefined) return true;
+    if (postedAt === null) return false;
+    const t = Date.parse(postedAt);
+    return !Number.isNaN(t) && t >= this.now().getTime() - POST_RECHECK_DAYS * DAY_MS;
+  }
+
+  /** DB에서 아직 받지 않은 첨부를 차례로 내려받는다. 실패한 것은 다음 동기화에서 다시 시도한다. 취소는 실패로 기록하지 않는다. */
+  private async downloadPending(
+    warnings: string[],
+    signal: AbortSignal | undefined,
+    progress: ProgressCounter,
+  ): Promise<{ files: SyncSummary["files"]; cancelled: boolean }> {
     const out = { downloaded: 0, reused: 0, failed: 0, pending: 0 };
-    for (const att of this.db.pendingAttachments()) {
+    let cancelled = false;
+    const pending = this.db.pendingAttachments();
+    progress.addTotal(pending.length, `첨부 ${pending.length}개`);
+    for (const att of pending) {
+      if (signal?.aborted) {
+        cancelled = true;
+        break;
+      }
       try {
         const rel = this.relativePathFor(att);
         const dest = resolve(this.filesDir, rel);
         if (!dest.startsWith(this.filesDir + sep)) throw new Error(`저장 경로가 files 디렉터리 밖입니다: ${rel}`);
         await mkdir(dirname(dest), { recursive: true });
-        const { size, sha256 } = await this.client.download(att.url, dest);
+        const { size, sha256 } = await this.client.download(att.url, dest, signal ? { signal } : {});
         let localPath = rel;
         const same = this.db.findDownloadedBySha(sha256);
         if (same && same !== rel && existsSync(join(this.filesDir, same))) {
@@ -347,15 +451,20 @@ export class ArchiveSync {
         }
         this.db.markDownloaded(att.id, { localPath, size, sha256, downloadedAt: nowKst(this.now()) });
       } catch (err) {
+        if (err instanceof AbortError || signal?.aborted) {
+          cancelled = true;
+          break;
+        }
         if (isFatal(err)) throw err;
         const msg = errorSummary(err);
         this.db.markDownloadFailed(att.id, msg);
         warnings.push(`${att.courseName} 첨부 "${att.name}" 다운로드 실패: ${msg}`);
         out.failed++;
       }
+      progress.step(`첨부 ${att.name}`);
     }
     out.pending = this.db.pendingAttachments().length;
-    return out;
+    return { files: out, cancelled };
   }
 
   /** `<lectureSeq>_<과목명>/<assignments|submissions|notices|materials>/<번호>/<파일명>` (files 기준, `/` 구분 상대 경로). */

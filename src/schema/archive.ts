@@ -26,4 +26,6 @@ export const SyncSummarySchema = z.object({
   warnings: z.array(z.string()),
   dbPath: z.string(),
   filesDir: z.string(),
+  /** 도중에 취소됐으면 true. 그때까지 저장한 것은 남는다. */
+  cancelled: z.boolean().optional(),
 });

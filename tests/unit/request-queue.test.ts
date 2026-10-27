@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { HttpStatusError, TimeoutError } from "../../src/http/errors.js";
+import { AbortError, HttpStatusError, NetworkError, TimeoutError } from "../../src/http/errors.js";
 import { RequestQueue } from "../../src/queue/request-queue.js";
 
 beforeEach(() => {
@@ -85,6 +85,56 @@ describe("RequestQueue", () => {
     const err = await result;
     expect(err).toBeInstanceOf(HttpStatusError);
     expect((err as HttpStatusError).status).toBe(404);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("이미 취소된 signal: fn을 실행하지 않고 AbortError", async () => {
+    const q = new RequestQueue();
+    const ac = new AbortController();
+    ac.abort();
+    const fn = vi.fn(async () => "x");
+    const result = q.enqueue(fn, { signal: ac.signal }).catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(await result).toBeInstanceOf(AbortError);
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("대기 중 취소: 바로 AbortError, 차례가 와도 실행하지 않고 다음 요청은 진행", async () => {
+    const q = new RequestQueue();
+    const ac = new AbortController();
+    const first = q.enqueue(() => new Promise<string>((r) => setTimeout(() => r("a"), 1_000)));
+    const fn = vi.fn(async () => "b");
+    const second = q.enqueue(fn, { signal: ac.signal }).catch((e: unknown) => e);
+    const third = q.enqueue(async () => "c");
+    await vi.advanceTimersByTimeAsync(100);
+    ac.abort();
+    expect(await second).toBeInstanceOf(AbortError);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(await first).toBe("a");
+    expect(await third).toBe("c");
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("실행 중 취소: 내부 signal을 끊고 재시도 없이 AbortError(감싸지 않음)", async () => {
+    const q = new RequestQueue({ maxRetries: 3 });
+    const ac = new AbortController();
+    let inner: AbortSignal | undefined;
+    const fn = vi.fn(
+      (signal: AbortSignal) =>
+        new Promise<never>((_, reject) => {
+          inner = signal;
+          // fetch처럼 끊기면 전송 실패로 거부한다(재시도 대상 오류).
+          signal.addEventListener("abort", () => reject(new NetworkError("aborted")));
+        }),
+    );
+    const result = q.enqueue(fn, { signal: ac.signal }).catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(100);
+    ac.abort();
+    await vi.advanceTimersByTimeAsync(5_000);
+    const err = await result;
+    expect(err).toBeInstanceOf(AbortError);
+    expect((err as Error).message).toBe("요청이 취소되었습니다");
+    expect(inner?.aborted).toBe(true);
     expect(fn).toHaveBeenCalledTimes(1);
   });
 });

@@ -28,3 +28,11 @@ export class HostNotAllowedError extends Error {
     this.name = "HostNotAllowedError";
   }
 }
+
+/** 호출한 쪽(도구 호출 취소 등)이 요청을 취소했다. 큐는 재시도하지 않고, HttpClient도 다른 오류로 감싸지 않는다. */
+export class AbortError extends Error {
+  constructor() {
+    super("요청이 취소되었습니다");
+    this.name = "AbortError";
+  }
+}

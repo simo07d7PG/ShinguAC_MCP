@@ -329,11 +329,12 @@ export class ArchiveDb {
     return this.db.prepare("SELECT 1 FROM submissions WHERE report_seq = ?").get(reportSeq) !== undefined;
   }
 
-  hasPost(lectureSeq: string, board: Board, wrId: string): boolean {
-    return (
-      this.db.prepare("SELECT 1 FROM posts WHERE lecture_seq = ? AND board = ? AND wr_id = ?").get(lectureSeq, board, wrId) !==
-      undefined
-    );
+  /** 저장된 게시글의 등록일시. 글이 없으면 undefined, 등록일시를 모르면 null. */
+  getPostPostedAt(lectureSeq: string, board: Board, wrId: string): string | null | undefined {
+    const row = this.db
+      .prepare("SELECT posted_at FROM posts WHERE lecture_seq = ? AND board = ? AND wr_id = ?")
+      .get(lectureSeq, board, wrId) as { posted_at: string | null } | undefined;
+    return row ? row.posted_at : undefined;
   }
 
   upsertPost(p: PostRow, fetchedAt: string): "new" | "updated" | "same" {

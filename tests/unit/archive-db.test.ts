@@ -53,11 +53,11 @@ describe("ArchiveDb", () => {
     expect(db.hasSubmission("10")).toBe(true);
 
     const post = { lectureSeq: "1", board: "material" as const, wrId: "001", title: "자료", postedAt: T, author: "김교수", bodyHtml: "<p>x</p>", bodyText: "x" };
-    expect(db.hasPost("1", "material", "001")).toBe(false);
+    expect(db.getPostPostedAt("1", "material", "001")).toBeUndefined();
     expect(db.upsertPost(post, T)).toBe("new");
     expect(db.upsertPost(post, T)).toBe("same");
-    expect(db.hasPost("1", "material", "001")).toBe(true);
-    expect(db.hasPost("1", "notice", "001")).toBe(false);
+    expect(db.getPostPostedAt("1", "material", "001")).toBe(T);
+    expect(db.getPostPostedAt("1", "notice", "001")).toBeUndefined();
   });
 
   it("첨부 맞추기: 같은 것은 다운로드 기록 유지, 바뀐 것은 다시 받기, 사라진 것은 삭제", () => {

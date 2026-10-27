@@ -6,8 +6,8 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { PortalCookieJar } from "./cookie-jar.js";
 import { decodeBody } from "./decode.js";
-import { HostNotAllowedError, HttpStatusError, NetworkError } from "./errors.js";
-import { requestQueue, type EnqueueOptions, type RequestQueue } from "../queue/request-queue.js";
+import { AbortError, HostNotAllowedError, HttpStatusError, NetworkError } from "./errors.js";
+import { downloadRequestQueue, requestQueue, type EnqueueOptions, type RequestQueue } from "../queue/request-queue.js";
 
 /** cec.shingu.ac.kr: E클래스 첨부 다운로드(`eClassDown.jsp`). */
 export const DEFAULT_ALLOWED_HOSTS = ["student.shingu.ac.kr", "login.shingu.ac.kr", "www.shingu.ac.kr", "cec.shingu.ac.kr"];
@@ -21,6 +21,8 @@ export interface HttpClientOptions {
   fetch?: typeof fetch;
   jar?: PortalCookieJar;
   queue?: RequestQueue;
+  /** download() 전용 큐. 없으면 `queue`(테스트 주입 큐 재사용), 그것도 없으면 전역 downloadRequestQueue. */
+  downloadQueue?: RequestQueue;
   allowedHosts?: string[];
   logger?: { debug(...args: unknown[]): void };
 }
@@ -61,6 +63,7 @@ export class HttpClient {
   private readonly fetchFn: typeof fetch;
   private readonly jar: PortalCookieJar;
   private readonly queue: RequestQueue;
+  private readonly downloadQueue: RequestQueue;
   private readonly allowedHosts: Set<string>;
   private readonly logger?: { debug(...args: unknown[]): void };
 
@@ -68,6 +71,7 @@ export class HttpClient {
     this.fetchFn = options.fetch ?? ((input, init) => fetch(input, init));
     this.jar = options.jar ?? new PortalCookieJar();
     this.queue = options.queue ?? requestQueue;
+    this.downloadQueue = options.downloadQueue ?? options.queue ?? downloadRequestQueue;
     this.allowedHosts = new Set(options.allowedHosts ?? DEFAULT_ALLOWED_HOSTS);
     this.logger = options.logger;
   }
@@ -97,8 +101,9 @@ export class HttpClient {
   }
 
   /**
-   * GET 응답 본문을 `dest`에 스트리밍으로 저장한다(임시 파일 → rename). 큐를 거치며 리다이렉트도 허용 호스트만 따른다.
+   * GET 응답 본문을 `dest`에 스트리밍으로 저장한다(임시 파일 → rename). 다운로드 큐를 거치며 리다이렉트도 허용 호스트만 따른다.
    * Content-Length와 받은 크기가 다르면 실패로 본다. 기본 제한 시간은 DOWNLOAD_TIMEOUT_MS.
+   * `signal`이 abort되면 받던 스트림을 끊고 임시 파일을 지운 뒤 AbortError를 그대로 던진다(재시도·감싸기 없음).
    */
   async download(startUrl: string, dest: string, options: RequestOptions = {}): Promise<DownloadResult> {
     const queueOptions: EnqueueOptions = { ...options, timeoutMs: options.timeoutMs ?? DOWNLOAD_TIMEOUT_MS };
@@ -106,7 +111,7 @@ export class HttpClient {
     let url = this.assertAllowed(startUrl);
     try {
       for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-        const out = await this.queue.enqueue(async (signal) => {
+        const out = await this.downloadQueue.enqueue(async (signal) => {
           const cookie = await this.jar.headerFor(url);
           const reqHeaders: Record<string, string> = {
             "User-Agent": USER_AGENT,
@@ -144,7 +149,7 @@ export class HttpClient {
               },
             });
             const body = res.body ? Readable.fromWeb(res.body as WebReadableStream) : Readable.from([]);
-            await pipeline(body, meter, createWriteStream(tmp));
+            await pipeline(body, meter, createWriteStream(tmp), { signal });
             const expected = res.headers.get("content-length");
             // 압축 응답이면 Content-Length는 압축된 크기라 비교하지 않는다.
             if (expected !== null && !res.headers.get("content-encoding") && Number(expected) !== size) {
@@ -152,6 +157,7 @@ export class HttpClient {
             }
             return { result: { size, sha256: hash.digest("hex"), headers: res.headers, tmp } };
           } catch (err) {
+            if (options.signal?.aborted) throw new AbortError();
             if (err instanceof HttpStatusError || err instanceof NetworkError) throw err;
             throw new NetworkError(`다운로드 실패: ${url}`, { cause: err });
           }

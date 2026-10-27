@@ -278,11 +278,33 @@ describe("조회 도구", () => {
 describe("sync_eclass", () => {
   it("download_files·full을 전달하고 요약을 반환한다", async () => {
     const out = structured(await call("sync_eclass", { download_files: false, full: true }));
-    expect(service.syncArchive).toHaveBeenLastCalledWith({ downloadFiles: false, full: true });
+    expect(service.syncArchive).toHaveBeenLastCalledWith(
+      expect.objectContaining({ downloadFiles: false, full: true, signal: expect.any(AbortSignal), onProgress: undefined }),
+    );
     expect(out["term"]).toBe("2026-2");
     expect((out["files"] as { downloaded: number }).downloaded).toBe(2);
     await call("sync_eclass");
-    expect(service.syncArchive).toHaveBeenLastCalledWith({ downloadFiles: undefined, full: undefined });
+    expect(service.syncArchive).toHaveBeenLastCalledWith(expect.objectContaining({ downloadFiles: undefined, full: undefined }));
+  });
+
+  it("progressToken이 있으면 진행률을 notifications/progress로 보낸다", async () => {
+    service.syncArchive.mockImplementationOnce(async (opts: { onProgress?: (p: object) => void }) => {
+      opts.onProgress?.({ progress: 0, total: 2, message: "강의 2개" });
+      opts.onProgress?.({ progress: 1, total: 2, message: "자료구조 완료" });
+      opts.onProgress?.({ progress: 2, total: 3, message: "첨부 a.pdf" });
+      return (await mockService().syncArchive()) as Record<string, unknown>;
+    });
+    const seen: Array<{ progress: number; total?: number; message?: string }> = [];
+    await client.listTools();
+    const res = (await client.callTool({ name: "sync_eclass", arguments: {} }, undefined, {
+      onprogress: (p) => seen.push(p),
+    })) as CallToolResult;
+    expect(res.isError).toBeFalsy();
+    expect(seen).toEqual([
+      { progress: 0, total: 2, message: "강의 2개" },
+      { progress: 1, total: 2, message: "자료구조 완료" },
+      { progress: 2, total: 3, message: "첨부 a.pdf" },
+    ]);
   });
 });
 

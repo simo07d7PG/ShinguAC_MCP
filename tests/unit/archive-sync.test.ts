@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as cheerio from "cheerio";
@@ -43,6 +43,8 @@ let homeworkList: string;
 /** 지정하면 모든 과제 상세를 이 화면으로, 제출 폼을 editModal로 돌려준다. */
 let detailOverride: string | undefined;
 let editModal: string;
+/** 요청마다 불린다(취소 시점 지정용). */
+let onRequest: ((r: Recorded) => void) | undefined;
 
 function route(r: Recorded): Response {
   const page = r.query.get("pageIndex") ?? "1";
@@ -92,6 +94,7 @@ function makeService(now: Date = NOW): CategoryService {
       current = new URLSearchParams(String(init?.body)).get("lectureSeq") ?? undefined;
     }
     requests.push(r);
+    onRequest?.(r);
     return route(r);
   };
   const client = new HttpClient({ fetch: fetchMock as typeof fetch, queue: new RequestQueue({ minGapMs: 0 }) });
@@ -125,6 +128,7 @@ beforeEach(async () => {
   homeworkList = fixture("eclass/homework-list.html");
   detailOverride = undefined;
   editModal = fixture("eclass/homework-edit-modal.html");
+  onRequest = undefined;
 });
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -137,6 +141,9 @@ const openInList = (): string[] =>
     })
     .map((r) => r.reportSeq);
 const PAST = "UPDATE assignments SET due_at = '2026-09-01T23:59:00+09:00', extended_due_at = NULL";
+/** NOW 기준 15일 전(재확인 창 밖). */
+const OLD_POSTS = "UPDATE posts SET posted_at = '2026-10-11T11:59:00+09:00'";
+const downloads = (): number => count("/01shingu/eClassDown.jsp") + count("/file/download");
 afterEach(async () => {
   db.close();
   await rm(root, { recursive: true, force: true });
@@ -197,9 +204,11 @@ describe("ArchiveSync (sync_eclass)", () => {
     expect(leftovers).toEqual([]);
   });
 
-  it("두 번째 동기화(증분): 저장된 게시글과 마감 지난 과제는 다시 읽지 않는다", async () => {
+  it("두 번째 동기화(증분): 오래된 저장 게시글과 마감 지난 과제는 다시 읽지 않는다", async () => {
     const service = makeService();
     await service.syncArchive();
+    // 등록일시가 재확인 창(14일)보다 오래된 글로 바꿔 둔다.
+    db.all(OLD_POSTS);
     // 픽스처 상세는 모두 같은 마감이므로, 34771·34757만 남기고 저장값을 마감 지난 과제로 바꿔 둔다.
     db.all(`${PAST} WHERE report_seq NOT IN ('34771', '34757')`);
     requests = [];
@@ -294,6 +303,113 @@ describe("ArchiveSync (sync_eclass)", () => {
       archiveError: "E클래스 아카이브 DB를 열지 못했습니다: locked",
     });
     await expect(svc.syncArchive()).rejects.toThrow(/locked/);
+  });
+});
+
+describe("ArchiveSync 게시글 재확인(R9)", () => {
+  it("14일 안의 같은 글을 두 번 동기화하면 다시 읽지만 updated 0, 재다운로드 없음", async () => {
+    const service = makeService();
+    await service.syncArchive();
+    requests = [];
+    const res = await service.syncArchive();
+    // 자료실 10건은 2026-10-12 등록(NOW 기준 14일 안) → 다시 읽는다
+    expect(requests.filter((r) => r.path === "/eclass/clas/board/detail" && r.query.get("boardId") === "3")).toHaveLength(10);
+    const ui = res.courses.find((c) => c.lectureSeq === "27962")!;
+    expect(ui.materials).toEqual({ total: 10, new: 0, updated: 0 });
+    expect(downloads()).toBe(0);
+    expect(res.files).toEqual({ downloaded: 0, reused: 0, failed: 0, pending: 0 });
+  });
+
+  it("14일 안의 글만 다시 읽고, 바뀌었으면 갱신한다", async () => {
+    const service = makeService();
+    await service.syncArchive({ downloadFiles: false });
+    const old = db
+      .all<{ wr_id: string }>("SELECT wr_id FROM posts WHERE board = 'material' ORDER BY wr_id LIMIT 5")
+      .map((r) => r.wr_id);
+    db.all(`${OLD_POSTS} WHERE board = 'material' AND wr_id IN (${old.map((w) => `'${w}'`).join(", ")})`);
+    materialDetail = materialDetail.replace(/(<div[^>]*min-height[^>]*>)/, "$1 수정된 안내");
+    requests = [];
+    const res = await service.syncArchive({ downloadFiles: false });
+    const reread = requests
+      .filter((r) => r.path === "/eclass/clas/board/detail" && r.query.get("boardId") === "3")
+      .map((r) => r.query.get("wrId")!);
+    expect(reread).toHaveLength(5);
+    expect(reread.some((w) => old.includes(w))).toBe(false);
+    expect(res.courses.find((c) => c.lectureSeq === "27962")!.materials.updated).toBe(5);
+  });
+});
+
+describe("ArchiveSync 취소·진행률(R6)", () => {
+  it("과제 상세를 읽는 중 취소: cancelled, 실패 기록 없음, 읽은 것은 남는다", async () => {
+    const ac = new AbortController();
+    let details = 0;
+    onRequest = (r) => {
+      if (r.path === "/eclass/clas/room/homework/homeworkDetail" && ++details === 3) ac.abort();
+    };
+    const res = await makeService().syncArchive({ signal: ac.signal });
+    expect(res.cancelled).toBe(true);
+    expect(res.courses.every((c) => c.error === undefined)).toBe(true);
+    // 진행 중이던 3번째 상세까지 저장하고 다음 과제 전에 멈춘다
+    expect(db.all("SELECT COUNT(*) n FROM assignments")).toEqual([{ n: 3 }]);
+    expect(count("/eclass/clas/room/homework/homeworkDetail")).toBe(3);
+    // 취소된 강의의 게시글은 읽지 않고, 그 뒤로는 포털 요청이 없다(앞선 강의는 끝까지 저장)
+    expect(requests.filter((r) => r.path === "/eclass/clas/board/detail" && r.lecture === "27962")).toHaveLength(0);
+    expect(requests.at(-1)!.path).toBe("/eclass/clas/room/homework/homeworkDetail");
+    expect(downloads()).toBe(0);
+    expect(db.all("SELECT COUNT(*) n FROM attachments WHERE error IS NOT NULL")).toEqual([{ n: 0 }]);
+  });
+
+  it("첨부를 받는 중 취소: cancelled, 실패로 표시하지 않고 남은 첨부는 pending", async () => {
+    const ac = new AbortController();
+    onRequest = (r) => {
+      if (r.path === "/01shingu/eClassDown.jsp" && count("/01shingu/eClassDown.jsp") === 2) ac.abort();
+    };
+    const res = await makeService().syncArchive({ signal: ac.signal });
+    expect(res.cancelled).toBe(true);
+    expect(res.files.failed).toBe(0);
+    expect(res.files.downloaded).toBe(1);
+    expect(res.files.pending).toBeGreaterThan(0);
+    expect(downloads()).toBe(2);
+    expect(res.courses.map((c) => c.lectureSeq).sort()).toEqual(["27962", "28153"]);
+    expect(db.all("SELECT COUNT(*) n FROM attachments WHERE error IS NOT NULL")).toEqual([{ n: 0 }]);
+    const leftovers = (await readdir(join(root, "files"), { recursive: true })).filter((f) => String(f).endsWith(".part"));
+    expect(leftovers).toEqual([]);
+  });
+
+  it("이미 취소된 signal이면 포털에 요청하지 않는다", async () => {
+    const ac = new AbortController();
+    ac.abort();
+    const res = await makeService().syncArchive({ signal: ac.signal });
+    expect(res.cancelled).toBe(true);
+    expect(requests).toEqual([]);
+  });
+
+  it("진행률은 하나의 누적 카운터: progress는 줄지 않고 total ≥ progress, 끝나면 progress = total", async () => {
+    const events: Array<{ progress: number; total: number; message: string }> = [];
+    const res = await makeService().syncArchive({ onProgress: (p) => events.push(p) });
+    expect(res.cancelled).toBeUndefined();
+    expect(events.length).toBeGreaterThan(4);
+    for (let i = 0; i < events.length; i++) {
+      expect(events[i]!.total).toBeGreaterThanOrEqual(events[i]!.progress);
+      if (i > 0) {
+        expect(events[i]!.progress).toBeGreaterThanOrEqual(events[i - 1]!.progress);
+        expect(events[i]!.total).toBeGreaterThanOrEqual(events[i - 1]!.total);
+      }
+    }
+    const atts = (db.all("SELECT COUNT(*) n FROM attachments")[0] as { n: number }).n;
+    const last = events.at(-1)!;
+    // 강의 4개 + 첨부 수
+    expect(last).toMatchObject({ progress: 4 + atts, total: 4 + atts });
+  });
+
+  it("시작할 때 이전에 남은 *.part 파일을 지운다", async () => {
+    const dir = join(root, "files", "27962_UI화면설계", "materials", "1");
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, "a.pdf.123.abcd.part"), "x");
+    await writeFile(join(dir, "keep.pdf"), "y");
+    await makeService().syncArchive({ downloadFiles: false });
+    expect(existsSync(join(dir, "a.pdf.123.abcd.part"))).toBe(false);
+    expect(existsSync(join(dir, "keep.pdf"))).toBe(true);
   });
 });
 
