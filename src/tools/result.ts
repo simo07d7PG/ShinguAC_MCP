@@ -8,6 +8,39 @@ import type { Result } from "../service/category-service.js";
 
 export const SOURCE_NOTE = "출처: 신구대학교 학생종합포털.";
 
+/** 저장본 우선 조회 도구(수강 과목·성적) 공통 안내. */
+export const STORED_NOTE =
+  "로컬 아카이브(~/.shingu-mcp/eclass.db)에 저장된 사본을 돌려주며(fetchedAt은 저장 시각), 저장본이 없거나 24시간이 지났으면 포털에서 다시 읽어 저장한다. ";
+
+/** 도구 호출 extra에서 진행률·알림에 쓰는 부분. */
+interface ProgressExtra {
+  _meta?: { progressToken?: string | number };
+  sendNotification: (n: {
+    method: "notifications/progress";
+    params: { progressToken: string | number; progress: number; total: number; message: string };
+  }) => Promise<void>;
+}
+
+/**
+ * 클라이언트가 progressToken을 주면 진행률을 notifications/progress로 보내는 콜백(없으면 undefined).
+ * 전송 실패는 작업을 멈추지 않게 삼킨다.
+ */
+export function progressSender(
+  extra: ProgressExtra,
+): ((p: { progress: number; total: number; message: string }) => void) | undefined {
+  const progressToken = extra._meta?.progressToken;
+  if (progressToken === undefined) return undefined;
+  return ({ progress, total, message }) => {
+    try {
+      extra
+        .sendNotification({ method: "notifications/progress", params: { progressToken, progress, total, message } })
+        .catch(() => {});
+    } catch {
+      // 연결이 끊긴 경우 등: 진행률은 부가 정보라 무시한다.
+    }
+  };
+}
+
 /** 조회 도구 공통 출력: `{ data, fetchedAt }`. */
 export function withMeta<T extends z.ZodType>(data: T) {
   return MetaSchema.extend({ data });

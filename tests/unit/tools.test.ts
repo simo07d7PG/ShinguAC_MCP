@@ -85,6 +85,9 @@ function mockService(): { [K in keyof ToolService]: ReturnType<typeof vi.fn> } {
       warnings: [],
       dbPath: "/h/.shingu-mcp/eclass.db",
       filesDir: "/h/.shingu-mcp/files",
+      timetable: { entries: 12, status: "same" as const },
+      enrolledCourses: { entries: 6, status: "updated" as const },
+      grades: { status: "failed" as const, error: "NetworkError: x" },
     })),
   };
 }
@@ -217,9 +220,11 @@ describe("조회 도구", () => {
 
   it("get_assignments: due_within_days를 dueWithinDays로 전달한다", async () => {
     await call("get_assignments", { due_within_days: 7 });
-    expect(service.getAssignments).toHaveBeenLastCalledWith({ dueWithinDays: 7 });
+    expect(service.getAssignments).toHaveBeenLastCalledWith(
+      expect.objectContaining({ dueWithinDays: 7, signal: expect.any(AbortSignal), onProgress: undefined }),
+    );
     await call("get_assignments");
-    expect(service.getAssignments).toHaveBeenLastCalledWith({ dueWithinDays: undefined });
+    expect(service.getAssignments).toHaveBeenLastCalledWith(expect.objectContaining({ dueWithinDays: undefined }));
   });
 
   it("get_timetable: week가 속한 주의 실제 날짜를 붙인다", async () => {
@@ -283,6 +288,8 @@ describe("sync_eclass", () => {
     );
     expect(out["term"]).toBe("2026-2");
     expect((out["files"] as { downloaded: number }).downloaded).toBe(2);
+    expect(out["enrolledCourses"]).toEqual({ entries: 6, status: "updated" });
+    expect(out["grades"]).toEqual({ status: "failed", error: "NetworkError: x" });
     await call("sync_eclass");
     expect(service.syncArchive).toHaveBeenLastCalledWith(expect.objectContaining({ downloadFiles: undefined, full: undefined }));
   });

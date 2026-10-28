@@ -164,6 +164,14 @@ export function needsSubmitProbe(status: SubmitStatus, deadlineIso: string | nul
   return status === "not_open" && deadline !== null && now.getTime() > Date.parse(deadline);
 }
 
+/**
+ * 제출은 되돌릴 수 없다. 저장된 상태가 제출인데 새로 읽은 상태가 `not_open`이면(마감 뒤 버튼이 사라졌는데
+ * 제출 폼 판정이 실패한 경우) 제출로 둔다. archive-sync와 get_assignment가 같이 쓴다.
+ */
+export function keepSubmitted(stored: string | undefined, fresh: SubmitStatus): SubmitStatus {
+  return stored === "submitted" && fresh === "not_open" ? "submitted" : fresh;
+}
+
 /** 목록 행 + (선택) 상세를 합쳐 스키마를 통과하는 Assignment 목록을 만든다. */
 export function buildAssignments(
   lecture: EclassLecture,

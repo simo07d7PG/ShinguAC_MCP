@@ -2,7 +2,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ArchiveDb, type AssignmentRow } from "../../src/store/archive-db.js";
+import { ArchiveDb, isStale, STALE_MS, type AssignmentRow } from "../../src/store/archive-db.js";
+import type { Course, Grades } from "../../src/schema/index.js";
 
 const T = "2026-10-26T12:00:00+09:00";
 let db: ArchiveDb;
@@ -92,11 +93,37 @@ describe("ArchiveDb", () => {
       first.upsertCourse({ lectureSeq: "1", courseName: "자료구조", year: 2026, semester: "2" }, T);
       first.close();
       const again = new ArchiveDb(path);
-      expect(again.all("PRAGMA user_version")).toEqual([{ user_version: 2 }]);
+      expect(again.all("PRAGMA user_version")).toEqual([{ user_version: 4 }]);
       expect(again.all("SELECT course_name FROM courses")).toEqual([{ course_name: "자료구조" }]);
       again.all("PRAGMA user_version = 99");
       again.close();
       expect(() => new ArchiveDb(path)).toThrow(/v99.*업데이트/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("v2 DB를 열면 v3·v4(저장본·동기화 기록·시도 기록·과제 열)만 추가하고 기존 데이터는 둔다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "archive-db-"));
+    try {
+      const path = join(dir, "eclass.db");
+      const first = new ArchiveDb(path);
+      first.upsertCourse({ lectureSeq: "1", courseName: "자료구조", year: 2026, semester: "2" }, T);
+      first.upsertAssignment(assignment(), T);
+      first.replaceTimetable({ year: 2026, semester: "2" }, [{ day: 1, period: 1, courseName: "자료구조", professorName: "김교수" }], T);
+      toV2(first);
+      first.close();
+      const again = new ArchiveDb(path);
+      expect(again.all("PRAGMA user_version")).toEqual([{ user_version: 4 }]);
+      expect(again.all("SELECT report_seq, submit_status, submitted_count, scored FROM assignments")).toEqual([
+        { report_seq: "10", submit_status: "not_submitted", submitted_count: null, scored: null },
+      ]);
+      expect(again.getTimetable({ year: 2026, semester: "2" })?.entries).toHaveLength(1);
+      expect(again.getCourses({ year: 2026, semester: "2" })).toBeUndefined();
+      expect(again.getEclassSyncedAt({ year: 2026, semester: "2" })).toBeUndefined();
+      // v3 이전 행은 평가 여부를 모른다(null) → get_assignment는 포털로 다시 읽는다
+      expect(again.getAssignmentDetail("10")).toMatchObject({ scored: null, contentText: "내용", attachments: [] });
+      again.close();
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -108,19 +135,137 @@ describe("ArchiveDb", () => {
       const path = join(dir, "eclass.db");
       const first = new ArchiveDb(path);
       first.upsertCourse({ lectureSeq: "1", courseName: "자료구조", year: 2026, semester: "2" }, T);
-      // v1 상태로 되돌린다(시간표 테이블 없음)
+      // v1 상태로 되돌린다(시간표·v3 테이블과 열 없음)
+      toV2(first);
       first.all("DROP TABLE timetable_entries");
       first.all("DROP TABLE timetables");
       first.all("PRAGMA user_version = 1");
       first.close();
       const again = new ArchiveDb(path);
-      expect(again.all("PRAGMA user_version")).toEqual([{ user_version: 2 }]);
+      expect(again.all("PRAGMA user_version")).toEqual([{ user_version: 4 }]);
       expect(again.all("SELECT course_name FROM courses")).toEqual([{ course_name: "자료구조" }]);
       expect(again.getTimetable({ year: 2026, semester: "2" })).toBeUndefined();
       again.close();
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+/** v3에서 추가한 테이블·열을 지우고 user_version을 2로 되돌린다. */
+function toV2(db: ArchiveDb): void {
+  db.all("DROP TABLE views");
+  db.all("DROP TABLE eclass_syncs");
+  db.all("DROP TABLE eclass_sync_attempts");
+  for (const col of ["submitted_count", "total_count", "scored"]) db.all(`ALTER TABLE assignments DROP COLUMN ${col}`);
+  db.all("PRAGMA user_version = 2");
+}
+
+describe("isStale", () => {
+  const now = new Date("2026-10-26T12:00:00+09:00");
+  it("없음·해석 불가·STALE_MS 초과는 오래됨, 경계와 그 안은 신선", () => {
+    expect(STALE_MS).toBe(24 * 60 * 60 * 1000);
+    expect(isStale(undefined, now)).toBe(true);
+    expect(isStale("bad", now)).toBe(true);
+    expect(isStale("2026-10-25T12:00:00+09:00", now)).toBe(false);
+    expect(isStale("2026-10-25T11:59:59+09:00", now)).toBe(true);
+    expect(isStale("2026-10-26T11:00:00+09:00", now)).toBe(false);
+    expect(isStale("2026-10-26T12:00:00+09:00", now)).toBe(false);
+    // 미래 시각(시계가 바뀐 경우)은 오래된 것으로 본다
+    expect(isStale("2026-10-26T12:00:01+09:00", now)).toBe(true);
+    // 기준 시간을 바꿀 수 있다(실패한 동기화 재시도 간격)
+    expect(isStale("2026-10-26T11:30:00+09:00", now, 60 * 60 * 1000)).toBe(false);
+    expect(isStale("2026-10-26T10:59:59+09:00", now, 60 * 60 * 1000)).toBe(true);
+  });
+});
+
+describe("ArchiveDb v3 저장본", () => {
+  const term = { year: 2026, semester: "2" };
+  const course: Course = {
+    courseName: "자료구조",
+    year: 2026,
+    semester: "2",
+    professor: { name: "김교수", email: "prof@example.com" },
+    lectureSeq: "1",
+  };
+  const grades: Grades = { semesters: [], credits: [], current: [] };
+
+  it("수강 과목·성적: new → same(fetchedAt 갱신) → updated, 학기·종류별로 따로", () => {
+    expect(db.getCourses(term)).toBeUndefined();
+    expect(db.replaceCourses(term, [course], T)).toBe("new");
+    const later = "2026-10-27T09:00:00+09:00";
+    expect(db.replaceCourses(term, [course], later)).toBe("same");
+    expect(db.getCourses(term)).toEqual({ data: [course], fetchedAt: later });
+    expect(db.replaceCourses(term, [{ ...course, credits: 3 }], later)).toBe("updated");
+    expect(db.getCourses({ year: 2026, semester: "1" })).toBeUndefined();
+    expect(db.getGrades(term)).toBeUndefined();
+    expect(db.replaceGrades(term, grades, T)).toBe("new");
+    expect(db.getGrades(term)).toEqual({ data: grades, fetchedAt: T });
+  });
+
+  it("스키마에 맞지 않는 저장본은 없는 것으로 본다", () => {
+    db.all("INSERT INTO views (kind, year, semester, data, fetched_at) VALUES ('courses', 2026, '2', '[{\"x\":1}]', ?)", T);
+    expect(db.getCourses(term)).toBeUndefined();
+    db.all("INSERT INTO views (kind, year, semester, data, fetched_at) VALUES ('grades', 2026, '2', 'not json', ?)", T);
+    expect(db.getGrades(term)).toBeUndefined();
+  });
+
+  it("과제: 제출현황·평가 여부는 변경으로 세지 않고 덮어쓰며, 같아도 fetched_at을 갱신한다", () => {
+    expect(db.upsertAssignment(assignment({ submittedCount: 3, totalCount: 28, scored: false }), T)).toBe("new");
+    const later = "2026-10-27T09:00:00+09:00";
+    expect(db.upsertAssignment(assignment({ submittedCount: 5, totalCount: 28, scored: false }), later)).toBe("same");
+    // 생략하면 저장값 유지
+    expect(db.upsertAssignment(assignment(), later)).toBe("same");
+    db.replaceAttachments("assignment", "10", "1", [{ name: "a.pdf", url: "https://cec.shingu.ac.kr/x?file_key=a" }]);
+    expect(db.getAssignmentDetail("10")).toMatchObject({
+      courseName: "자료구조",
+      submittedCount: 5,
+      totalCount: 28,
+      scored: false,
+      contentText: "내용",
+      fetchedAt: later,
+      attachments: [{ name: "a.pdf", url: "https://cec.shingu.ac.kr/x?file_key=a" }],
+    });
+    expect(db.listAssignments({ year: 2026, semester: "2" }).map((a) => a.reportSeq)).toEqual(["10"]);
+    expect(db.listAssignments({ year: 2026, semester: "1" })).toEqual([]);
+  });
+
+  it("listAssignments는 강의 번호를 숫자로 정렬하고, updateAssignmentCounts는 제출현황만 바꾼다(null이면 유지)", () => {
+    db.upsertCourse({ lectureSeq: "9", courseName: "운영체제", year: 2026, semester: "2" }, T);
+    db.upsertCourse({ lectureSeq: "10", courseName: "네트워크", year: 2026, semester: "2" }, T);
+    db.upsertAssignment(assignment({ reportSeq: "1", lectureSeq: "10" }), T);
+    db.upsertAssignment(assignment({ reportSeq: "2", lectureSeq: "9", submittedCount: 1, totalCount: 9 }), T);
+    expect(db.listAssignments({ year: 2026, semester: "2" }).map((a) => a.lectureSeq)).toEqual(["9", "10"]);
+    db.updateAssignmentCounts("2", 4, null);
+    expect(db.getAssignmentDetail("2")).toMatchObject({ submittedCount: 4, totalCount: 9, fetchedAt: T, submitStatus: "not_submitted" });
+  });
+
+  it("markDownloaded에 url을 주면 그 사이 링크가 바뀐 행에는 쓰지 않는다", () => {
+    db.replaceAttachments("assignment", "10", "1", [{ name: "a.pdf", url: "https://x/a" }]);
+    const [att] = db.pendingAttachments();
+    db.replaceAttachments("assignment", "10", "1", [{ name: "a.pdf", url: "https://x/b" }]);
+    db.markDownloaded(att!.id, { localPath: "c/a.pdf", size: 1, sha256: "s", downloadedAt: T, url: "https://x/a" });
+    expect(db.pendingAttachments().map((p) => p.url)).toEqual(["https://x/b"]);
+    db.markDownloaded(att!.id, { localPath: "c/a.pdf", size: 1, sha256: "s", downloadedAt: T, url: "https://x/b" });
+    expect(db.pendingAttachments()).toEqual([]);
+  });
+
+  it("markSubmitted: 확인되면 제출 + 오래된 것, 미확인이면 오래된 것만. 동기화 기록은 학기별", () => {
+    db.upsertAssignment(assignment(), T);
+    db.markSubmitted("10", false);
+    const unconfirmed = db.getAssignmentDetail("10")!;
+    expect(unconfirmed.submitStatus).toBe("not_submitted");
+    expect(isStale(unconfirmed.fetchedAt, new Date(T))).toBe(true);
+    db.markSubmitted("10", true);
+    const d = db.getAssignmentDetail("10")!;
+    expect(d.submitStatus).toBe("submitted");
+    expect(isStale(d.fetchedAt, new Date(T))).toBe(true);
+    db.markSubmitted("404", true); // 없는 과제는 무시
+    db.markEclassSynced(term, T);
+    expect(db.getEclassSyncedAt(term)).toBe(T);
+    expect(db.getEclassSyncedAt({ year: 2027, semester: "1" })).toBeUndefined();
+    expect(db.hasCourse("1")).toBe(true);
+    expect(db.hasCourse("2")).toBe(false);
   });
 });
 

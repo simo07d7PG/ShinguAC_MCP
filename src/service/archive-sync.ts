@@ -7,18 +7,20 @@ import { AbortError } from "../http/errors.js";
 import { DOWNLOAD_TEMP_RE, type HttpClient } from "../http/http-client.js";
 import { logger as defaultLogger } from "../log/logger.js";
 import { redact } from "../log/redact.js";
-import { effectiveDeadline, needsSubmitProbe, parseHomeworkDetail, type HomeworkRow } from "../parsers/assignments.js";
+import { effectiveDeadline, keepSubmitted, needsSubmitProbe, parseHomeworkDetail, type HomeworkRow } from "../parsers/assignments.js";
 import { ParseError, fragmentToText } from "../parsers/common.js";
 import type { EclassLecture } from "../parsers/eclass.js";
 import { parseNoticeId } from "../parsers/notices.js";
 import { judgeSubmission, type FileDetail, type SubmitForm } from "../parsers/submit.js";
+import { fetchCoursesWithLectures } from "../portal/courses.js";
 import { enterLecture, fetchEclassBoardAll, fetchEclassBoardPost, fetchEclassHome, fetchHomeworkList } from "../portal/eclass.js";
-import { currentAcademicTerm } from "../portal/semester.js";
+import { fetchGrades } from "../portal/grades.js";
+import { currentAcademicTerm, type AcademicTerm } from "../portal/semester.js";
 import { fetchFileInfo, fetchHomeworkDetailHtml, fetchSubmissionForm } from "../portal/submit.js";
 import { fetchTimetable } from "../portal/timetable.js";
 import { PORTAL_ORIGIN } from "../portal/urls.js";
 import type { ArchiveDb, Board, PendingAttachment } from "../store/archive-db.js";
-import { BOARD_IDS } from "../store/archive-db.js";
+import { BOARD_IDS, isStale, RETRY_BACKOFF_MS } from "../store/archive-db.js";
 import { Mutex } from "../util/mutex.js";
 import { nowKst } from "../util/time.js";
 
@@ -47,6 +49,9 @@ export interface SyncProgress {
   message: string;
 }
 
+/** 저장본 하나(시간표·수강 과목·성적)의 갱신 결과. */
+export type ViewRefresh<T> = (T & { status: "new" | "updated" | "same" }) | { status: "failed"; error: string };
+
 interface Counts {
   total: number;
   new: number;
@@ -74,7 +79,11 @@ export interface SyncSummary {
   dbPath: string;
   filesDir: string;
   /** 이번 학기 시간표 갱신 결과. 취소로 시작하지 못했으면 없다. */
-  timetable?: { entries: number; status: "new" | "updated" | "same" } | { status: "failed"; error: string };
+  timetable?: ViewRefresh<{ entries: number }>;
+  /** 이번 학기 수강 과목(연락처 포함) 갱신 결과. 취소로 시작하지 못했으면 없다. */
+  enrolledCourses?: ViewRefresh<{ entries: number }>;
+  /** 성적 갱신 결과(semesters: 학기별 성적 행 수). 취소로 시작하지 못했으면 없다. */
+  grades?: ViewRefresh<{ semesters: number }>;
   /** 도중에 취소됐으면 true. 그때까지 저장한 것은 남는다. */
   cancelled?: boolean;
 }
@@ -152,8 +161,10 @@ export class ArchiveSync {
   private readonly eclassLock: Mutex;
   private readonly now: () => Date;
   private readonly logger: Logger;
-  /** 동기화 두 개가 겹치면 같은 파일을 동시에 쓰게 되므로 한 번에 하나만 돈다. */
+  /** E클래스 단계(DB 쓰기)는 한 번에 하나만 돈다. */
   private readonly syncLock = new Mutex();
+  /** 첨부 다운로드는 같은 파일을 동시에 쓰지 않도록 한 번에 하나만 돈다(E클래스 단계와는 따로). */
+  private readonly downloadLock = new Mutex();
 
   constructor(options: ArchiveSyncOptions) {
     this.session = options.session;
@@ -166,95 +177,180 @@ export class ArchiveSync {
     this.logger = options.logger ?? defaultLogger;
   }
 
-  sync(opts: SyncOptions = {}): Promise<SyncSummary> {
-    return this.syncLock.run(async () => {
+  /**
+   * 전체 동기화. E클래스 단계(시간표·수강 과목·성적 + 강의별 과제·게시글)는 syncLock 안에서 하고,
+   * 첨부 다운로드는 그 잠금을 놓은 뒤 downloadLock 안에서 한다. 그래서 다운로드 중에도
+   * get_assignments의 자동 동기화(syncIfStale)는 다른 동기화의 E클래스 단계만 기다린다.
+   */
+  async sync(opts: SyncOptions = {}): Promise<SyncSummary> {
+    const progress = new ProgressCounter(opts.onProgress);
+    // 임시 파일 정리는 다른 sync_eclass가 받는 중인 파일을 건드리지 않도록 downloadLock을 기다린다(의도된 대기).
+    if (!opts.signal?.aborted) await this.downloadLock.run(() => this.removePartFiles());
+    const phase = await this.syncLock.run(() => this.runEclassPhase(opts, progress, true));
+    let { cancelled } = phase;
+    let files: SyncSummary["files"];
+    if (cancelled || opts.downloadFiles === false) {
+      files = { downloaded: 0, reused: 0, failed: 0, pending: this.db.pendingAttachments().length };
+    } else {
+      const res = await this.downloadLock.run(() => this.downloadPending(phase.summary.warnings, opts.signal, progress));
+      files = res.files;
+      cancelled = res.cancelled;
+    }
+    if (cancelled) {
+      this.logger.info(
+        `아카이브: 동기화 취소됨(강의 ${phase.summary.courses.length + phase.summary.skippedEmptyCourses}/${phase.lectures}개, 첨부 ${files.downloaded + files.reused}개 처리)`,
+      );
+    }
+    return { ...phase.summary, files, ...(cancelled ? { cancelled: true } : {}) };
+  }
+
+  /**
+   * 이번 학기 동기화 기록이 없거나 STALE_MS보다 오래됐을 때만 E클래스 과제·게시글 단계를 돈다
+   * (시간표·수강 과목·성적은 각 조회 도구가 스스로 갱신하므로 건너뛰고, 첨부 파일은 받지 않는다).
+   * 기록이 신선하면 잠금을 기다리지 않고 바로 돌아오며, 잠금 안에서 다시 확인해 겹친 호출이 두 번 동기화하지 않는다.
+   * 동기화했으면 요약, 아니면 undefined.
+   */
+  async syncIfStale(opts: Pick<SyncOptions, "signal" | "onProgress"> = {}): Promise<SyncSummary | undefined> {
+    // 성공한 동기화는 STALE_MS, 실패한 강의가 있던 시도는 RETRY_BACKOFF_MS 동안 신선한 것으로 본다.
+    const stale = (): boolean => {
       const term = currentAcademicTerm(this.now());
-      const syncedAt = nowKst(this.now());
-      const warnings: string[] = [];
-      const { signal } = opts;
-      const progress = new ProgressCounter(opts.onProgress);
-      await this.removePartFiles();
-      const courses: CourseSyncSummary[] = [];
-      let skippedEmptyCourses = 0;
-      let cancelled = signal?.aborted ?? false;
-      const timetable = cancelled ? undefined : await this.syncTimetable(term, warnings);
+      return (
+        isStale(this.db.getEclassSyncedAt(term), this.now()) &&
+        isStale(this.db.getEclassAttemptedAt(term), this.now(), RETRY_BACKOFF_MS)
+      );
+    };
+    if (!stale()) return undefined;
+    const phase = await this.syncLock.run(async () =>
+      stale() ? this.runEclassPhase(opts, new ProgressCounter(opts.onProgress), false) : undefined,
+    );
+    if (!phase) return undefined;
+    return {
+      ...phase.summary,
+      files: { downloaded: 0, reused: 0, failed: 0, pending: this.db.pendingAttachments().length },
+      ...(phase.cancelled ? { cancelled: true } : {}),
+    };
+  }
+
+  /** E클래스 단계. syncLock 안에서 호출한다. views=false면 시간표·수강 과목·성적 갱신을 건너뛴다. */
+  private async runEclassPhase(
+    opts: SyncOptions,
+    progress: ProgressCounter,
+    views: boolean,
+  ): Promise<{ summary: Omit<SyncSummary, "files" | "cancelled">; cancelled: boolean; lectures: number }> {
+    const term = currentAcademicTerm(this.now());
+    const syncedAt = nowKst(this.now());
+    const warnings: string[] = [];
+    const { signal } = opts;
+    const courses: CourseSyncSummary[] = [];
+    let skippedEmptyCourses = 0;
+    let cancelled = signal?.aborted ?? false;
+    // 시간표·수강 과목·성적은 강의 동기화 전에 갱신한다(각각 실패해도 계속).
+    const view = async <T>(label: string, fn: () => Promise<T & { status: "new" | "updated" | "same" }>) => {
+      if (!views || cancelled) return undefined;
+      const r = await this.refreshView(label, warnings, fn);
       cancelled ||= signal?.aborted ?? false;
-      const lectures = cancelled ? [] : await this.eclassLock.run(() => fetchEclassHome(this.session, term));
-      progress.addTotal(lectures.length, `강의 ${lectures.length}개`);
-      for (const lecture of lectures) {
-        if (signal?.aborted) {
+      return r;
+    };
+    const timetable = await view("시간표", () => this.syncTimetable(term));
+    const enrolledCourses = await view("수강 과목", () => this.syncCourses(term));
+    const grades = await view("성적", () => this.syncGrades(term));
+    const lectures = cancelled ? [] : await this.eclassLock.run(() => fetchEclassHome(this.session, term));
+    progress.addTotal(lectures.length, `강의 ${lectures.length}개`);
+    for (const lecture of lectures) {
+      if (signal?.aborted) {
+        cancelled = true;
+        break;
+      }
+      try {
+        const summary = await this.eclassLock.run(() =>
+          this.syncLecture(lecture, term, syncedAt, opts.full ?? false, warnings, signal),
+        );
+        if (summary) courses.push(summary);
+        else skippedEmptyCourses++;
+      } catch (err) {
+        // 취소는 과목 실패가 아니다. 그때까지 저장한 것은 그대로 두고 멈춘다.
+        if (err instanceof AbortError) {
           cancelled = true;
           break;
         }
-        try {
-          const summary = await this.eclassLock.run(() =>
-            this.syncLecture(lecture, term, syncedAt, opts.full ?? false, warnings, signal),
-          );
-          if (summary) courses.push(summary);
-          else skippedEmptyCourses++;
-        } catch (err) {
-          // 취소는 과목 실패가 아니다. 그때까지 저장한 것은 그대로 두고 멈춘다.
-          if (err instanceof AbortError) {
-            cancelled = true;
-            break;
-          }
-          if (isFatal(err)) throw err;
-          this.logger.warn(`아카이브: ${lecture.courseName} 동기화 실패`, errorSummary(err));
-          courses.push({
-            lectureSeq: lecture.lectureSeq,
-            courseName: lecture.courseName,
-            assignments: { total: 0, new: 0, updated: 0 },
-            submissions: { new: 0, updated: 0 },
-            notices: { total: 0, new: 0, updated: 0 },
-            materials: { total: 0, new: 0, updated: 0 },
-            error: errorSummary(err),
-          });
-        }
-        progress.step(`${lecture.courseName} 완료`);
+        if (isFatal(err)) throw err;
+        this.logger.warn(`아카이브: ${lecture.courseName} 동기화 실패`, errorSummary(err));
+        courses.push({
+          lectureSeq: lecture.lectureSeq,
+          courseName: lecture.courseName,
+          assignments: { total: 0, new: 0, updated: 0 },
+          submissions: { new: 0, updated: 0 },
+          notices: { total: 0, new: 0, updated: 0 },
+          materials: { total: 0, new: 0, updated: 0 },
+          error: errorSummary(err),
+        });
       }
-      let files: SyncSummary["files"];
-      if (cancelled || opts.downloadFiles === false) {
-        files = { downloaded: 0, reused: 0, failed: 0, pending: this.db.pendingAttachments().length };
-      } else {
-        const res = await this.downloadPending(warnings, signal, progress);
-        files = res.files;
-        cancelled = res.cancelled;
-      }
-      if (cancelled) {
-        this.logger.info(
-          `아카이브: 동기화 취소됨(강의 ${courses.length + skippedEmptyCourses}/${lectures.length}개, 첨부 ${files.downloaded + files.reused}개 처리)`,
-        );
-      }
-      return {
+      progress.step(`${lecture.courseName} 완료`);
+    }
+    // 조회 도구(get_assignments)가 저장본의 신선도를 판단하는 기준.
+    // 강의를 끝까지 돌지 못했거나(취소) 실패한 강의가 있으면 남기지 않는다(다음 조회가 다시 동기화한다).
+    // 실패한 강의가 있으면 시도 시각만 남겨, 한동안(RETRY_BACKOFF_MS) 매 조회마다 다시 돌지 않게 한다.
+    if (!cancelled) {
+      if (courses.every((c) => c.error === undefined)) this.db.markEclassSynced(term, syncedAt);
+      else this.db.markEclassAttempted(term, syncedAt);
+    }
+    return {
+      summary: {
         term: `${term.year}-${term.semester}`,
         syncedAt,
         courses,
         skippedEmptyCourses,
-        files,
         warnings,
         dbPath: this.dbPath,
         filesDir: this.filesDir,
         ...(timetable ? { timetable } : {}),
-        ...(cancelled ? { cancelled: true } : {}),
-      };
-    });
+        ...(enrolledCourses ? { enrolledCourses } : {}),
+        ...(grades ? { grades } : {}),
+      },
+      cancelled,
+      lectures: lectures.length,
+    };
   }
 
-  /** 이번 학기 시간표(요청 1회). 실패해도 E클래스 동기화는 계속하고 경고만 남긴다(자격증명 오류는 멈춤). */
-  private async syncTimetable(
-    term: { year: number; semester: "1" | "2" },
+  /** 저장본 하나를 갱신한다. 실패해도 E클래스 동기화는 계속하고 경고만 남긴다(자격증명 오류는 멈춤, 저장본은 그대로). */
+  private async refreshView<T>(
+    label: string,
     warnings: string[],
-  ): Promise<NonNullable<SyncSummary["timetable"]>> {
+    fn: () => Promise<T & { status: "new" | "updated" | "same" }>,
+  ): Promise<ViewRefresh<T>> {
     try {
-      const page = await fetchTimetable(this.session, term);
-      const status = this.db.replaceTimetable(term, page.entries, nowKst(this.now()));
-      return { entries: page.entries.length, status };
+      return await fn();
     } catch (err) {
       if (isFatal(err)) throw err;
       const error = errorSummary(err);
-      warnings.push(`시간표를 갱신하지 못했습니다(저장된 시간표는 그대로): ${error}`);
+      warnings.push(`${label}을(를) 갱신하지 못했습니다(저장본은 그대로): ${error}`);
       return { status: "failed", error };
     }
+  }
+
+  /** 이번 학기 시간표(요청 1회). */
+  private async syncTimetable(term: AcademicTerm): Promise<{ entries: number; status: "new" | "updated" | "same" }> {
+    const page = await fetchTimetable(this.session, term);
+    return { entries: page.entries.length, status: this.db.replaceTimetable(term, page.entries, nowKst(this.now())) };
+  }
+
+  /** 이번 학기 수강 과목(연락처 포함): 2 + 매칭 과목당 3요청. 강의 진입이 있어 eclassLock 안에서 읽는다. */
+  private async syncCourses(term: AcademicTerm): Promise<{ entries: number; status: "new" | "updated" | "same" }> {
+    const fetchedAt = nowKst(this.now());
+    const courses = await this.eclassLock.run(() =>
+      fetchCoursesWithLectures(this.session, term, {
+        includeContacts: true,
+        onContactError: (c, err) => this.logger.warn(`아카이브: 연락처 파싱 실패(${c.courseName})`, errorSummary(err)),
+      }),
+    );
+    return { entries: courses.length, status: this.db.replaceCourses(term, courses, fetchedAt) };
+  }
+
+  /** 성적(요청 3회). 전체 학기를 이번 학기 키로 저장한다. */
+  private async syncGrades(term: AcademicTerm): Promise<{ semesters: number; status: "new" | "updated" | "same" }> {
+    const fetchedAt = nowKst(this.now());
+    const grades = await fetchGrades(this.session);
+    return { semesters: grades.semesters.length, status: this.db.replaceGrades(term, grades, fetchedAt) };
   }
 
   /** 이전 동기화가 중단되며 남긴 다운로드 임시 파일을 지운다. 실패는 무시한다(다음 동기화에서 다시 시도). */
@@ -330,7 +426,11 @@ export class ArchiveSync {
     const label = (s: string): string => `${lecture.courseName} ${s}`;
 
     for (const row of homework) {
-      if (!full && !this.needsAssignmentRefresh(row)) continue;
+      if (!full && !this.needsAssignmentRefresh(row)) {
+        // 상세는 다시 읽지 않지만 목록에 보이는 제출현황은 맞춰 둔다(요청 없음).
+        this.db.updateAssignmentCounts(row.reportSeq, row.submittedCount, row.totalCount);
+        continue;
+      }
       checkAbort();
       const html = await fetchHomeworkDetailHtml(this.session, row.reportSeq);
       const d = parseHomeworkDetail(html);
@@ -353,7 +453,7 @@ export class ArchiveSync {
           }
         }
       }
-      const submitStatus = submission ? "submitted" : d.submitStatus;
+      const submitStatus = keepSubmitted(this.db.getAssignmentState(row.reportSeq)?.submitStatus, submission ? "submitted" : d.submitStatus);
       const fetchedAt = nowKst(this.now());
       const res = this.db.transaction(() => {
         const r = this.db.upsertAssignment(
@@ -368,6 +468,9 @@ export class ArchiveSync {
             contentHtml: d.bodyHtml,
             contentText: fragmentToText(d.bodyHtml),
             submitStatus,
+            submittedCount: d.submittedCount ?? row.submittedCount,
+            totalCount: d.totalCount ?? row.totalCount,
+            scored: d.scored,
           },
           fetchedAt,
         );
@@ -490,7 +593,7 @@ export class ArchiveSync {
         } else {
           out.downloaded++;
         }
-        this.db.markDownloaded(att.id, { localPath, size, sha256, downloadedAt: nowKst(this.now()) });
+        this.db.markDownloaded(att.id, { localPath, size, sha256, downloadedAt: nowKst(this.now()), url: att.url });
       } catch (err) {
         if (err instanceof AbortError || signal?.aborted) {
           cancelled = true;

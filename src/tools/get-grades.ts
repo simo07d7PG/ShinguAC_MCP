@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { GradesSchema } from "../schema/index.js";
 import type { GetService } from "./index.js";
-import { flatten, run, SOURCE_NOTE, withMeta } from "./result.js";
+import { flatten, run, SOURCE_NOTE, STORED_NOTE, withMeta } from "./result.js";
 
 export function registerGetGrades(server: McpServer, getService: GetService): void {
   server.registerTool(
@@ -10,7 +10,9 @@ export function registerGetGrades(server: McpServer, getService: GetService): vo
     {
       title: "성적",
       description:
-        "학기별 성적(평점·이수학점·학사경고), 이수구분별 학점 합계, 이번 학기 과목별 성적을 반환한다. " + SOURCE_NOTE,
+        "학기별 성적(평점·이수학점·학사경고), 이수구분별 학점 합계, 이번 학기 과목별 성적을 반환한다. " +
+        STORED_NOTE +
+        SOURCE_NOTE,
       inputSchema: {
         semester: z
           .string()

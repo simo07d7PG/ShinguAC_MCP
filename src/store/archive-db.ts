@@ -1,7 +1,34 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { z } from "zod";
+import { CourseSchema, type Course } from "../schema/course.js";
+import { GradesSchema, type Grades } from "../schema/grade.js";
 import type { TimetableEntry } from "../schema/timetable.js";
+
+/** 저장본(시간표·수강 과목·성적·E클래스 과제)을 그대로 돌려주는 최대 경과 시간. 넘으면 조회 시 포털에서 다시 읽는다. */
+export const STALE_MS = 24 * 60 * 60 * 1000;
+
+/** 실패한 강의가 있던 E클래스 동기화 시도 뒤, get_assignments가 다시 동기화하기까지 기다리는 시간. */
+export const RETRY_BACKOFF_MS = 60 * 60 * 1000;
+
+/**
+ * 저장 시각이 없거나(저장본 없음) STALE_MS보다 오래됐으면 true.
+ * 해석할 수 없는 시각과 지금보다 미래인 시각(시계가 바뀐 경우)도 오래된 것으로 본다.
+ */
+export function isStale(storedAt: string | null | undefined, now: Date, maxAgeMs = STALE_MS): boolean {
+  if (!storedAt) return true;
+  const t = Date.parse(storedAt);
+  return Number.isNaN(t) || t > now.getTime() || now.getTime() - t > maxAgeMs;
+}
+
+/** 다시 읽어야 한다고 표시할 때 쓰는 fetched_at(항상 STALE_MS보다 오래됨). 읽은 시각을 전혀 모를 때의 fetchedAt으로도 쓴다. */
+export const STALE_MARK = "1970-01-01T09:00:00+09:00";
+
+export interface Term {
+  year: number;
+  semester: string;
+}
 
 /** 게시판 종류. 수업공지 boardId=1, 자료실 boardId=3. */
 export type Board = "notice" | "material";
@@ -29,6 +56,34 @@ export interface AssignmentRow {
   contentHtml: string;
   contentText: string;
   submitStatus: string;
+  /** v3. 생략(undefined)하면 저장된 값을 유지한다. */
+  submittedCount?: number | null;
+  totalCount?: number | null;
+  scored?: boolean | null;
+}
+
+/** 이번 학기 과제 목록(get_assignments)용 저장 행. 마감은 원래 값. */
+export interface StoredAssignment {
+  lectureSeq: string;
+  courseName: string;
+  professor: string | null;
+  reportSeq: string;
+  title: string;
+  startAt: string | null;
+  dueAt: string | null;
+  extendedDueAt: string | null;
+  submitStatus: string;
+  submittedCount: number | null;
+  totalCount: number | null;
+  scored: boolean | null;
+}
+
+/** 과제 상세(get_assignment)용 저장본. 마감은 원래 값. */
+export interface StoredAssignmentDetail extends StoredAssignment {
+  penaltyNote: string | null;
+  contentText: string;
+  attachments: AttachmentRef[];
+  fetchedAt: string;
 }
 
 export interface SubmissionRow {
@@ -207,7 +262,40 @@ const MIGRATIONS: string[] = [
     FOREIGN KEY (year, semester) REFERENCES timetables(year, semester) ON DELETE CASCADE
   );
   `,
+  // v3: 수강 과목·성적 저장본(학기별 JSON, 읽을 때 스키마 검증), 학기별 마지막 E클래스 동기화 시각,
+  // 과제 상세만으로 답하기 위한 제출현황·평가 여부.
+  `
+  CREATE TABLE views (
+    kind       TEXT NOT NULL CHECK (kind IN ('courses', 'grades')),
+    year       INTEGER NOT NULL,
+    semester   TEXT NOT NULL,
+    data       TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    PRIMARY KEY (kind, year, semester)
+  );
+  CREATE TABLE eclass_syncs (
+    year      INTEGER NOT NULL,
+    semester  TEXT NOT NULL,
+    synced_at TEXT NOT NULL,
+    PRIMARY KEY (year, semester)
+  );
+  ALTER TABLE assignments ADD COLUMN submitted_count INTEGER;
+  ALTER TABLE assignments ADD COLUMN total_count INTEGER;
+  ALTER TABLE assignments ADD COLUMN scored INTEGER;
+  `,
+  // v4: 실패한 강의가 있던 E클래스 동기화 시도 시각(get_assignments가 매번 다시 동기화하지 않도록 RETRY_BACKOFF_MS 동안 둔다).
+  `
+  CREATE TABLE eclass_sync_attempts (
+    year         INTEGER NOT NULL,
+    semester     TEXT NOT NULL,
+    attempted_at TEXT NOT NULL,
+    PRIMARY KEY (year, semester)
+  );
+  `,
 ];
+
+type ViewKind = "courses" | "grades";
+const VIEW_SCHEMAS = { courses: z.array(CourseSchema), grades: GradesSchema } as const;
 
 /** 시간표 항목 ↔ DB 행. 비교·저장 모두 이 순서를 쓴다. */
 const TIMETABLE_COLUMNS = [
@@ -347,16 +435,29 @@ export class ArchiveDb {
       submit_status: a.submitStatus,
     };
     const changed = !prev || Object.entries(next).some(([k, v]) => prev[k] !== v);
-    if (!changed) return "same";
+    // 제출현황·평가 여부는 다른 학생 제출만으로도 바뀌므로 변경 판정에 넣지 않고 늘 덮어쓴다(undefined면 유지).
+    // fetched_at은 마지막으로 포털에서 읽은 시각이라 내용이 같아도 갱신한다.
+    const v3 = [a.submittedCount ?? null, a.totalCount ?? null, a.scored === undefined || a.scored === null ? null : a.scored ? 1 : 0];
+    if (!changed) {
+      this.db
+        .prepare(
+          `UPDATE assignments SET fetched_at = ?, submitted_count = COALESCE(?, submitted_count),
+             total_count = COALESCE(?, total_count), scored = COALESCE(?, scored) WHERE report_seq = ?`,
+        )
+        .run(fetchedAt, ...v3, a.reportSeq);
+      return "same";
+    }
     this.db
       .prepare(
         `INSERT INTO assignments (report_seq, lecture_seq, title, start_at, due_at, extended_due_at, penalty_note,
-           content_html, content_text, submit_status, fetched_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           content_html, content_text, submit_status, fetched_at, submitted_count, total_count, scored)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (report_seq) DO UPDATE SET lecture_seq = excluded.lecture_seq, title = excluded.title,
            start_at = excluded.start_at, due_at = excluded.due_at, extended_due_at = excluded.extended_due_at,
            penalty_note = excluded.penalty_note, content_html = excluded.content_html,
-           content_text = excluded.content_text, submit_status = excluded.submit_status, fetched_at = excluded.fetched_at`,
+           content_text = excluded.content_text, submit_status = excluded.submit_status, fetched_at = excluded.fetched_at,
+           submitted_count = COALESCE(excluded.submitted_count, submitted_count),
+           total_count = COALESCE(excluded.total_count, total_count), scored = COALESCE(excluded.scored, scored)`,
       )
       .run(
         a.reportSeq,
@@ -370,6 +471,7 @@ export class ArchiveDb {
         a.contentText,
         a.submitStatus,
         fetchedAt,
+        ...v3,
       );
     return prev ? "updated" : "new";
   }
@@ -496,10 +598,17 @@ export class ArchiveDb {
     return rows.some((r) => r.local_path.normalize("NFC").toLowerCase() === key);
   }
 
-  markDownloaded(id: number, info: { localPath: string; size: number; sha256: string; downloadedAt: string }): void {
+  /**
+   * 내려받은 기록. url을 주면 그 사이 동기화가 링크를 바꾼 행(다시 받아야 함)에는 쓰지 않는다
+   * (다운로드는 E클래스 단계와 다른 잠금에서 돈다).
+   */
+  markDownloaded(id: number, info: { localPath: string; size: number; sha256: string; downloadedAt: string; url?: string }): void {
     this.db
-      .prepare("UPDATE attachments SET local_path = ?, size = ?, sha256 = ?, downloaded_at = ?, error = NULL WHERE id = ?")
-      .run(info.localPath, info.size, info.sha256, info.downloadedAt, id);
+      .prepare(
+        `UPDATE attachments SET local_path = ?, size = ?, sha256 = ?, downloaded_at = ?, error = NULL
+         WHERE id = ? AND (? IS NULL OR url = ?)`,
+      )
+      .run(info.localPath, info.size, info.sha256, info.downloadedAt, id, info.url ?? null, info.url ?? null);
   }
 
   markDownloadFailed(id: number, error: string): void {
@@ -706,6 +815,191 @@ export class ArchiveDb {
       entries.forEach((e, position) => insert.run(term.year, term.semester, position, ...timetableRow(e)));
       return prev ? "updated" : "new";
     });
+  }
+
+  /** 학기 수강 과목 저장본(연락처 포함). 없거나 스키마에 맞지 않으면 undefined. */
+  getCourses(term: Term): { data: Course[]; fetchedAt: string } | undefined {
+    return this.getView("courses", term);
+  }
+
+  /** 학기 수강 과목 저장본을 바꾼다. 반환은 replaceTimetable과 같다(같아도 fetched_at은 갱신). */
+  replaceCourses(term: Term, courses: Course[], fetchedAt: string): "new" | "updated" | "same" {
+    return this.replaceView("courses", term, courses, fetchedAt);
+  }
+
+  /** 성적 저장본(전체 학기). 읽은 시점의 학기 키로 둔다. 없거나 스키마에 맞지 않으면 undefined. */
+  getGrades(term: Term): { data: Grades; fetchedAt: string } | undefined {
+    return this.getView("grades", term);
+  }
+
+  replaceGrades(term: Term, grades: Grades, fetchedAt: string): "new" | "updated" | "same" {
+    return this.replaceView("grades", term, grades, fetchedAt);
+  }
+
+  private getView<K extends ViewKind>(
+    kind: K,
+    term: Term,
+  ): { data: z.infer<(typeof VIEW_SCHEMAS)[K]>; fetchedAt: string } | undefined {
+    const row = this.db
+      .prepare("SELECT data, fetched_at FROM views WHERE kind = ? AND year = ? AND semester = ?")
+      .get(kind, term.year, term.semester) as { data: string; fetched_at: string } | undefined;
+    if (!row) return undefined;
+    let json: unknown;
+    try {
+      json = JSON.parse(row.data);
+    } catch {
+      return undefined;
+    }
+    // 다른 버전이 쓴 형식이거나 손상됐으면 저장본이 없는 것으로 보고 다시 읽게 한다.
+    const parsed = VIEW_SCHEMAS[kind].safeParse(json);
+    return parsed.success ? { data: parsed.data as z.infer<(typeof VIEW_SCHEMAS)[K]>, fetchedAt: row.fetched_at } : undefined;
+  }
+
+  private replaceView(kind: ViewKind, term: Term, data: unknown, fetchedAt: string): "new" | "updated" | "same" {
+    const json = JSON.stringify(data);
+    return this.transaction(() => {
+      const prev = this.db
+        .prepare("SELECT data FROM views WHERE kind = ? AND year = ? AND semester = ?")
+        .get(kind, term.year, term.semester) as { data: string } | undefined;
+      this.db
+        .prepare(
+          `INSERT INTO views (kind, year, semester, data, fetched_at) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT (kind, year, semester) DO UPDATE SET data = excluded.data, fetched_at = excluded.fetched_at`,
+        )
+        .run(kind, term.year, term.semester, json, fetchedAt);
+      return !prev ? "new" : prev.data === json ? "same" : "updated";
+    });
+  }
+
+  /** 학기 E클래스 동기화를 (취소·강의 실패 없이) 마친 시각을 남긴다. */
+  markEclassSynced(term: Term, syncedAt: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO eclass_syncs (year, semester, synced_at) VALUES (?, ?, ?)
+         ON CONFLICT (year, semester) DO UPDATE SET synced_at = excluded.synced_at`,
+      )
+      .run(term.year, term.semester, syncedAt);
+  }
+
+  /** 학기 E클래스 동기화를 끝까지 돌았지만 실패한 강의가 있었던 시각을 남긴다. */
+  markEclassAttempted(term: Term, attemptedAt: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO eclass_sync_attempts (year, semester, attempted_at) VALUES (?, ?, ?)
+         ON CONFLICT (year, semester) DO UPDATE SET attempted_at = excluded.attempted_at`,
+      )
+      .run(term.year, term.semester, attemptedAt);
+  }
+
+  /** 학기 E클래스 동기화를 마지막으로 (실패한 강의와 함께) 시도한 시각. 없으면 undefined. */
+  getEclassAttemptedAt(term: Term): string | undefined {
+    const row = this.db
+      .prepare("SELECT attempted_at FROM eclass_sync_attempts WHERE year = ? AND semester = ?")
+      .get(term.year, term.semester) as { attempted_at: string } | undefined;
+    return row?.attempted_at;
+  }
+
+  /** 학기 강의의 과제 중 가장 최근에 포털에서 읽은 시각(다시 읽기 표시 행 제외). 없으면 undefined. */
+  newestAssignmentFetchedAt(term: Term): string | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT MAX(a.fetched_at) AS t FROM assignments a JOIN courses c ON c.lecture_seq = a.lecture_seq
+         WHERE c.year = ? AND c.semester = ? AND a.fetched_at <> ?`,
+      )
+      .get(term.year, term.semester, STALE_MARK) as { t: string | null };
+    return row.t ?? undefined;
+  }
+
+  /** 학기 E클래스 동기화를 마지막으로 마친 시각. 없으면 undefined. */
+  getEclassSyncedAt(term: Term): string | undefined {
+    const row = this.db
+      .prepare("SELECT synced_at FROM eclass_syncs WHERE year = ? AND semester = ?")
+      .get(term.year, term.semester) as { synced_at: string } | undefined;
+    return row?.synced_at;
+  }
+
+  private static readonly STORED_ASSIGNMENT_SELECT = `SELECT a.lecture_seq, c.course_name, c.professor, a.report_seq, a.title,
+      a.start_at, a.due_at, a.extended_due_at, a.submit_status, a.submitted_count, a.total_count, a.scored`;
+
+  private static storedAssignment(r: Record<string, unknown>): StoredAssignment {
+    const num = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
+    const str = (v: unknown): string | null => (v === null || v === undefined ? null : String(v));
+    return {
+      lectureSeq: String(r["lecture_seq"]),
+      courseName: String(r["course_name"]),
+      professor: str(r["professor"]),
+      reportSeq: String(r["report_seq"]),
+      title: String(r["title"]),
+      startAt: str(r["start_at"]),
+      dueAt: str(r["due_at"]),
+      extendedDueAt: str(r["extended_due_at"]),
+      submitStatus: String(r["submit_status"]),
+      submittedCount: num(r["submitted_count"]),
+      totalCount: num(r["total_count"]),
+      scored: r["scored"] === null || r["scored"] === undefined ? null : Number(r["scored"]) === 1,
+    };
+  }
+
+  /** 학기 강의의 저장된 과제. 강의 번호 → 과제 번호 내림차순(포털 목록처럼 최신 과제 먼저). */
+  listAssignments(term: Term): StoredAssignment[] {
+    const rows = this.db
+      .prepare(
+        `${ArchiveDb.STORED_ASSIGNMENT_SELECT}
+         FROM assignments a JOIN courses c ON c.lecture_seq = a.lecture_seq
+         WHERE c.year = ? AND c.semester = ?
+         ORDER BY CAST(c.lecture_seq AS INTEGER), CAST(a.report_seq AS INTEGER) DESC`,
+      )
+      .all(term.year, term.semester) as Record<string, unknown>[];
+    return rows.map((r) => ArchiveDb.storedAssignment(r));
+  }
+
+  /** 과제 상세 저장본(본문 텍스트·첨부 이름과 원본 링크 포함). 없으면 undefined. */
+  getAssignmentDetail(reportSeq: string): StoredAssignmentDetail | undefined {
+    const row = this.db
+      .prepare(
+        `${ArchiveDb.STORED_ASSIGNMENT_SELECT}, a.penalty_note, a.content_text, a.fetched_at
+         FROM assignments a JOIN courses c ON c.lecture_seq = a.lecture_seq WHERE a.report_seq = ?`,
+      )
+      .get(reportSeq) as Record<string, unknown> | undefined;
+    if (!row) return undefined;
+    const attachments = this.db
+      .prepare("SELECT name, url FROM attachments WHERE owner_type = 'assignment' AND owner_key = ? ORDER BY position")
+      .all(reportSeq) as { name: string; url: string }[];
+    return {
+      ...ArchiveDb.storedAssignment(row),
+      penaltyNote: row["penalty_note"] === null ? null : String(row["penalty_note"]),
+      contentText: String(row["content_text"]),
+      attachments: attachments.map((a) => ({ name: a.name, url: a.url })),
+      fetchedAt: String(row["fetched_at"]),
+    };
+  }
+
+  /** 강의 행이 있는가(과제를 저장할 수 있는지 — 외래키). */
+  hasCourse(lectureSeq: string): boolean {
+    return this.db.prepare("SELECT 1 FROM courses WHERE lecture_seq = ?").get(lectureSeq) !== undefined;
+  }
+
+  /**
+   * 제출을 보낸 과제: 다음 get_assignment가 포털에서 다시 읽도록 오래된 것으로 표시한다.
+   * confirmed(포털에서 반영을 확인함)일 때만 상태도 제출로 바꾼다.
+   */
+  markSubmitted(reportSeq: string, confirmed: boolean): void {
+    this.db
+      .prepare(
+        `UPDATE assignments SET fetched_at = ?, submit_status = CASE WHEN ? THEN 'submitted' ELSE submit_status END
+         WHERE report_seq = ?`,
+      )
+      .run(STALE_MARK, confirmed ? 1 : 0, reportSeq);
+  }
+
+  /** 목록에서 본 제출현황만 맞춘다(상세를 다시 읽지 않은 과제). null이면 저장값 유지. */
+  updateAssignmentCounts(reportSeq: string, submittedCount: number | null, totalCount: number | null): void {
+    this.db
+      .prepare(
+        `UPDATE assignments SET submitted_count = COALESCE(?, submitted_count), total_count = COALESCE(?, total_count)
+         WHERE report_seq = ?`,
+      )
+      .run(submittedCount, totalCount, reportSeq);
   }
 
   /** 테스트·진단용 단순 조회. */

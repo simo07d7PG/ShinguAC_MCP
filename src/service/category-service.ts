@@ -4,9 +4,15 @@ import type { SessionManager } from "../auth/session-manager.js";
 import type { HttpClient } from "../http/http-client.js";
 import { logger as defaultLogger } from "../log/logger.js";
 import { redact } from "../log/redact.js";
-import { buildAssignments, effectiveDeadline, needsSubmitProbe, parseHomeworkDetail, type HomeworkDetail } from "../parsers/assignments.js";
-import { ParseError } from "../parsers/common.js";
-import { mergeCourseContacts } from "../parsers/courses.js";
+import {
+  buildAssignments,
+  effectiveDeadline,
+  keepSubmitted,
+  needsSubmitProbe,
+  parseHomeworkDetail,
+  type HomeworkDetail,
+} from "../parsers/assignments.js";
+import { fragmentToText } from "../parsers/common.js";
 import { buildCmsUrl, parseNoticeId } from "../parsers/notices.js";
 import {
   attachFields,
@@ -17,7 +23,7 @@ import {
   textToHtml,
   type FileDetail,
 } from "../parsers/submit.js";
-import { fetchCurrentCourses } from "../portal/courses.js";
+import { fetchCoursesWithLectures } from "../portal/courses.js";
 import {
   enterLecture,
   fetchEclassBoardDetail,
@@ -25,8 +31,6 @@ import {
   fetchEclassHome,
   fetchHomeworkDetail,
   fetchHomeworkList,
-  fetchProfessorIntro,
-  fetchSyllabus,
 } from "../portal/eclass.js";
 import { fetchGrades } from "../portal/grades.js";
 import { fetchCmsNoticeDetail, fetchDashboardNotices } from "../portal/notices.js";
@@ -41,19 +45,20 @@ import {
   uploadAttachment,
 } from "../portal/submit.js";
 import { fetchTimetable } from "../portal/timetable.js";
-import type {
-  ArchiveSearchResult,
-  Assignment,
-  AssignmentDetail,
-  Course,
-  Grades,
-  Meta,
-  NoticeDetail,
-  NoticeSummary,
-  SubmitResult,
-  TimetableEntry,
+import {
+  AssignmentSchema,
+  type ArchiveSearchResult,
+  type Assignment,
+  type AssignmentDetail,
+  type Course,
+  type Grades,
+  type Meta,
+  type NoticeDetail,
+  type NoticeSummary,
+  type SubmitResult,
+  type TimetableEntry,
 } from "../schema/index.js";
-import type { ArchiveDb } from "../store/archive-db.js";
+import { isStale, STALE_MARK, type ArchiveDb, type StoredAssignment } from "../store/archive-db.js";
 import { Mutex } from "../util/mutex.js";
 import { nowKst } from "../util/time.js";
 import { searchArchive, type ArchiveSearchInput } from "./archive-search.js";
@@ -115,6 +120,29 @@ function inRange(iso: string | null, from: number, to: number): boolean {
   return t >= from && t <= to;
 }
 
+const detailUrl = (reportSeq: string): string => `/eclass/clas/room/homework/homeworkDetail?reportSeq=${reportSeq}`;
+const DETAIL_STATUS = new Set(["submitted", "not_submitted", "not_open"]);
+
+/** 저장된 과제 → get_assignments 항목. 마감은 buildAssignments처럼 실제 마감(`effectiveDeadline`)으로 바꾼다. */
+function storedAssignment(a: StoredAssignment): Assignment {
+  const out: Assignment = {
+    lectureSeq: a.lectureSeq,
+    reportSeq: a.reportSeq,
+    courseName: a.courseName,
+    professorName: a.professor || undefined,
+    title: a.title,
+    startAt: a.startAt,
+    dueAt: effectiveDeadline(a.dueAt),
+    extendedDueAt: effectiveDeadline(a.extendedDueAt),
+    submitStatus: DETAIL_STATUS.has(a.submitStatus) ? (a.submitStatus as Assignment["submitStatus"]) : "unknown",
+    submittedCount: a.submittedCount ?? undefined,
+    totalCount: a.totalCount ?? undefined,
+    detailUrl: detailUrl(a.reportSeq),
+  };
+  if (a.scored !== null) out.scored = a.scored;
+  return AssignmentSchema.parse(out);
+}
+
 export class CategoryService {
   private readonly session: SessionManager;
   private readonly client: HttpClient;
@@ -169,15 +197,46 @@ export class CategoryService {
   }
 
   /**
-   * 과제: 1(E클래스 홈) + 과목당 2(진입·목록) + 상세 N.
-   * 상세(제출 상태)는 마감이 [now, now+dueWithinDays](미지정 14일) 안인 과제만 조회한다.
-   * 나머지는 아카이브 DB에 제출(`submitted`)로 저장돼 있으면 `submitted`, 아니면 `unknown`.
-   * 반환은 dueWithinDays 지정 시 그 범위만(강의 색인은 필터 전 전체로 갱신).
+   * 과제 목록. 반환은 dueWithinDays 지정 시 그 범위만(연장 기한 기준, 강의 색인은 필터 전 전체로 갱신).
+   * 아카이브가 있으면 저장본(이번 학기 강의의 과제, 제출 상태는 동기화 때 상세로 읽은 값)으로 답하고 fetchedAt은 마지막 동기화 시각.
+   * 이번 학기 동기화 기록이 없거나 STALE_MS보다 오래됐으면 먼저 E클래스 과제·게시글 동기화(첨부 파일·시간표 등 제외)를 돌린다.
+   * signal·onProgress는 그 자동 동기화에 넘긴다(취소되면 그때까지 저장된 것으로 답한다).
+   * 아카이브가 없으면 포털: 1(E클래스 홈) + 과목당 2(진입·목록) + 상세 N.
+   * 상세(제출 상태)는 마감이 [now, now+dueWithinDays](미지정 14일) 안인 과제만 조회하고 나머지는 `unknown`.
    */
-  async getAssignments(opts: { dueWithinDays?: number } = {}): Promise<Result<Assignment[]>> {
-    const result = await this.live(() => this.eclassLock.run(async () => {
+  async getAssignments(
+    opts: { dueWithinDays?: number } & Pick<SyncOptions, "signal" | "onProgress"> = {},
+  ): Promise<Result<Assignment[]>> {
+    const result =
+      this.archive && this.archiveDb
+        ? await this.storedAssignments(this.archive, this.archiveDb, opts)
+        : await this.liveAssignments(opts.dueWithinDays);
+    for (const a of result.data) this.knownAssignments.set(a.reportSeq, a);
+    if (opts.dueWithinDays === undefined) return result;
+    const from = this.now().getTime();
+    const to = from + opts.dueWithinDays * DAY_MS;
+    // 반환 필터도 연장 기한 기준(아직 제출 가능한 과제 포함).
+    return { ...result, data: result.data.filter((a) => inRange(a.extendedDueAt ?? a.dueAt, from, to)) };
+  }
+
+  private async storedAssignments(
+    archive: ArchiveSync,
+    db: ArchiveDb,
+    opts: Pick<SyncOptions, "signal" | "onProgress">,
+  ): Promise<Result<Assignment[]>> {
+    await archive.syncIfStale({ signal: opts.signal, onProgress: opts.onProgress });
+    const term = currentAcademicTerm(this.now());
+    const data = db.listAssignments(term).map(storedAssignment);
+    // 성공한 동기화 기록이 없으면(실패한 강의가 있던 시도뿐이거나 없음) 저장된 과제를 실제로 읽은 가장 최근 시각.
+    const fetchedAt =
+      db.getEclassSyncedAt(term) ?? db.newestAssignmentFetchedAt(term) ?? db.getEclassAttemptedAt(term) ?? STALE_MARK;
+    return { data, meta: { fetchedAt } };
+  }
+
+  private liveAssignments(dueWithinDays: number | undefined): Promise<Result<Assignment[]>> {
+    return this.live(() => this.eclassLock.run(async () => {
       const from = this.now().getTime();
-      const to = from + (opts.dueWithinDays ?? DEFAULT_DETAIL_DAYS) * DAY_MS;
+      const to = from + (dueWithinDays ?? DEFAULT_DETAIL_DAYS) * DAY_MS;
       const lectures = await fetchEclassHome(this.session, currentAcademicTerm(this.now()));
       const all: Assignment[] = [];
       for (const lecture of lectures) {
@@ -192,76 +251,51 @@ export class CategoryService {
             details.set(row.reportSeq, await fetchHomeworkDetail(this.session, row.reportSeq));
           }
         }
-        // 상세를 읽지 않은 과제는 아카이브 DB에 제출로 저장돼 있을 때만 그것을 쓴다(포털 요청 없음).
-        // 제출은 되돌릴 수 없지만 미제출·기간 아님은 저장 뒤에 바뀌었을 수 있어 사실로 보여 주지 않는다.
-        all.push(
-          ...buildAssignments(lecture, rows, details, this.now()).map((a) =>
-            a.submitStatus === "unknown" && this.archiveDb?.getAssignmentState(a.reportSeq)?.submitStatus === "submitted"
-              ? { ...a, submitStatus: "submitted" as const }
-              : a,
-          ),
-        );
+        all.push(...buildAssignments(lecture, rows, details, this.now()));
       }
       return all;
     }));
-    for (const a of result.data) this.knownAssignments.set(a.reportSeq, a);
-    if (opts.dueWithinDays === undefined) return result;
-    const from = this.now().getTime();
-    const to = from + opts.dueWithinDays * DAY_MS;
-    // 반환 필터도 연장 기한 기준(아직 제출 가능한 과제 포함).
-    return { ...result, data: result.data.filter((a) => inRange(a.extendedDueAt ?? a.dueAt, from, to)) };
   }
 
   /**
-   * 시간표: 아카이브에 이번 학기 저장본이 있으면 그것(요청 0, fetchedAt은 저장 시각, 갱신은 sync_eclass).
-   * 저장본이 없거나 비어 있을 때(새 학기 수강신청 전후 등)만 포털에서 1요청으로 읽어 저장한다. 아카이브가 없으면 매번 포털.
+   * 시간표: 아카이브에 이번 학기 저장본이 있고 STALE_MS 안이면 그것(요청 0, fetchedAt은 저장 시각).
+   * 저장본이 없거나 비어 있거나(새 학기 수강신청 전후 등) 오래됐으면 포털에서 1요청으로 읽어 저장한다. 아카이브가 없으면 매번 포털.
    */
   async getTimetable(): Promise<Result<TimetableEntry[]>> {
     const term = currentAcademicTerm(this.now());
     const stored = this.archiveDb?.getTimetable(term);
-    if (stored && stored.entries.length > 0) return { data: stored.entries, meta: { fetchedAt: stored.fetchedAt } };
-    const result = await this.live(async () => (await fetchTimetable(this.session, term)).entries);
-    try {
-      this.archiveDb?.replaceTimetable(term, result.data, result.meta.fetchedAt);
-    } catch (err) {
-      // 저장은 부가 기능이다. DB 잠금·디스크 오류로 실패해도 받아 온 시간표는 돌려준다.
-      this.logger.warn("시간표 저장 실패", errorSummary(err));
-    }
-    return result;
+    return this.storedOrLive(
+      "시간표",
+      stored && stored.entries.length > 0 ? { data: stored.entries, fetchedAt: stored.fetchedAt } : undefined,
+      async () => (await fetchTimetable(this.session, term)).entries,
+      (db, data, fetchedAt) => db.replaceTimetable(term, data, fetchedAt),
+    );
   }
 
-  /** 수강 과목: 1(SSJ018P) + 1(E클래스 홈) [+ 매칭 과목당 3(진입·교수소개·수업계획서) — includeContacts]. */
-  getCourses(opts: { includeContacts?: boolean } = {}): Promise<Result<Course[]>> {
+  /**
+   * 수강 과목: 1(SSJ018P) + 1(E클래스 홈) [+ 매칭 과목당 3(진입·교수소개·수업계획서) — 연락처].
+   * 아카이브가 있으면 저장본(연락처 포함, STALE_MS 안)을 쓰고, 없거나 오래됐으면 연락처까지 읽어 저장한다.
+   * includeContacts=false면 돌려줄 때 연락처를 뺀다.
+   */
+  async getCourses(opts: { includeContacts?: boolean } = {}): Promise<Result<Course[]>> {
     const includeContacts = opts.includeContacts ?? true;
-    return this.live(() => this.eclassLock.run(async () => {
-      const courses = await fetchCurrentCourses(this.session);
-      const lectures = await fetchEclassHome(this.session, currentAcademicTerm(this.now()));
-      const out: Course[] = [];
-      for (const course of courses) {
-        const lecture =
-          lectures.find((l) => l.courseName === course.courseName && l.section === course.section) ??
-          lectures.find((l) => l.courseName === course.courseName);
-        if (!lecture) {
-          out.push(course);
-          continue;
-        }
-        let merged: Course = { ...course, lectureSeq: lecture.lectureSeq };
-        if (includeContacts) {
-          await enterLecture(this.session, lecture.lectureSeq);
-          try {
-            const intro = await fetchProfessorIntro(this.session);
-            const syllabus = await fetchSyllabus(this.session);
-            merged = mergeCourseContacts(merged, intro, syllabus);
-          } catch (err) {
-            // 연락처는 선택 필드라 한 과목 화면의 파싱 실패로 전체를 실패시키지 않는다.
-            if (!(err instanceof ParseError)) throw err;
-            this.logger.warn(`연락처 파싱 실패(${course.courseName})`, errorSummary(err));
-          }
-        }
-        out.push(merged);
-      }
-      return out;
-    }));
+    const term = currentAcademicTerm(this.now());
+    const stored = this.archiveDb?.getCourses(term);
+    const result = await this.storedOrLive(
+      "수강 과목",
+      // 비어 있는 저장본(수강신청 전에 읽은 것 등)은 시간표처럼 다시 읽는다.
+      stored && stored.data.length > 0 ? stored : undefined,
+      () =>
+        this.eclassLock.run(() =>
+          fetchCoursesWithLectures(this.session, term, {
+            includeContacts: includeContacts || this.archiveDb !== undefined,
+            onContactError: (c, err) => this.logger.warn(`연락처 파싱 실패(${c.courseName})`, errorSummary(err)),
+          }),
+        ),
+      (db, data, fetchedAt) => db.replaceCourses(term, data, fetchedAt),
+    );
+    if (includeContacts) return result;
+    return { ...result, data: result.data.map((c) => ({ ...c, professor: { name: c.professor.name } })) };
   }
 
   /**
@@ -293,11 +327,41 @@ export class CategoryService {
   }
 
   /**
-   * 과제 상세(본문·첨부·제출 상태): 강의 진입 + 상세 = 2요청.
-   * lectureSeq가 없으면 마지막 get_assignments 결과에서 reportSeq로 찾는다.
+   * 과제 상세(본문·첨부·제출 상태).
+   * 아카이브에 이 과제가 있고 STALE_MS 안에 읽은 것이면 저장본(요청 0, fetchedAt은 저장 시각, 본문은 저장된 텍스트).
+   * 아니면 포털: 강의 진입 + 상세 = 2요청(+ 제출 판정 1). 강의가 아카이브에 있으면 읽은 상세(과제·첨부)를 저장한다.
+   * lectureSeq가 없으면 마지막 get_assignments 결과, 없으면 아카이브 DB에서 reportSeq로 찾는다.
    */
   async getAssignment(opts: { reportSeq: string; lectureSeq?: string }): Promise<Result<AssignmentDetail>> {
     const { reportSeq, lectureSeq, known } = await this.resolveLecture(opts.reportSeq, opts.lectureSeq);
+    const stored = this.archiveDb?.getAssignmentDetail(reportSeq);
+    // v3 이전에 저장한 행은 평가 여부(scored)가 없으므로 포털에서 다시 읽는다.
+    if (
+      stored &&
+      stored.lectureSeq === lectureSeq &&
+      stored.scored !== null &&
+      DETAIL_STATUS.has(stored.submitStatus) &&
+      !isStale(stored.fetchedAt, this.now())
+    ) {
+      const data: AssignmentDetail = {
+        lectureSeq,
+        reportSeq,
+        courseName: stored.courseName,
+        title: stored.title,
+        startAt: stored.startAt,
+        dueAt: stored.dueAt,
+        extendedDueAt: stored.extendedDueAt,
+        penaltyNote: stored.penaltyNote ?? undefined,
+        submittedCount: stored.submittedCount ?? undefined,
+        totalCount: stored.totalCount ?? undefined,
+        body: stored.contentText,
+        attachments: stored.attachments,
+        submitStatus: stored.submitStatus as AssignmentDetail["submitStatus"],
+        scored: stored.scored,
+        detailUrl: detailUrl(reportSeq),
+      };
+      return { data, meta: { fetchedAt: stored.fetchedAt } };
+    }
     const fetchedAt = nowKst(this.now());
     const d = await this.eclassLock.run(async () => {
       await enterLecture(this.session, lectureSeq);
@@ -319,12 +383,43 @@ export class CategoryService {
           this.logger.warn(`과제 ${reportSeq} 제출 판정 실패`, errorSummary(err));
         }
       }
+      // 판정 요청이 실패해 not_open으로 보인 제출 과제는 저장된 제출을 유지한다(응답·저장 모두).
+      detail.submitStatus = keepSubmitted(stored?.submitStatus, detail.submitStatus);
       return detail;
     });
+    const db = this.archiveDb;
+    if (db?.hasCourse(lectureSeq)) {
+      try {
+        db.transaction(() => {
+          db.upsertAssignment(
+            {
+              reportSeq,
+              lectureSeq,
+              title: d.title,
+              startAt: d.startAt ?? stored?.startAt ?? null,
+              dueAt: d.dueAt ?? stored?.dueAt ?? null,
+              extendedDueAt: d.extendedDueAt ?? stored?.extendedDueAt ?? null,
+              penaltyNote: d.penaltyNote ?? null,
+              contentHtml: d.bodyHtml,
+              contentText: fragmentToText(d.bodyHtml),
+              submitStatus: d.submitStatus,
+              submittedCount: d.submittedCount,
+              totalCount: d.totalCount,
+              scored: d.scored,
+            },
+            fetchedAt,
+          );
+          db.replaceAttachments("assignment", reportSeq, lectureSeq, d.attachments);
+        });
+      } catch (err) {
+        // 저장은 부가 기능이다. 실패해도 읽은 상세는 돌려준다.
+        this.logger.warn(`과제 ${reportSeq} 저장 실패`, errorSummary(err));
+      }
+    }
     const data: AssignmentDetail = {
       lectureSeq,
       reportSeq,
-      courseName: known?.courseName,
+      courseName: known?.courseName ?? stored?.courseName,
       title: d.title,
       startAt: d.startAt,
       dueAt: d.dueAt,
@@ -336,7 +431,7 @@ export class CategoryService {
       attachments: d.attachments,
       submitStatus: d.submitStatus,
       scored: d.scored,
-      detailUrl: `/eclass/clas/room/homework/homeworkDetail?reportSeq=${reportSeq}`,
+      detailUrl: detailUrl(reportSeq),
     };
     return { data, meta: { fetchedAt } };
   }
@@ -359,7 +454,7 @@ export class CategoryService {
     const contentHtml = textToHtml(content);
     const label = `과제(reportSeq ${reportSeq})`;
 
-    return this.eclassLock.run(async () => {
+    const result = await this.eclassLock.run(async (): Promise<SubmitResult> => {
       await enterLecture(this.session, lectureSeq);
       const detailHtml = await fetchHomeworkDetailHtml(this.session, reportSeq);
       const detail = parseHomeworkDetail(detailHtml);
@@ -540,6 +635,15 @@ export class CategoryService {
         };
       }
     });
+    if (result.submitted) {
+      try {
+        // 다음 get_assignment가 포털에서 다시 읽도록 오래된 것으로 표시한다. 상태는 반영을 확인했을 때만 제출로 바꾼다.
+        this.archiveDb?.markSubmitted(reportSeq, result.verified);
+      } catch (err) {
+        this.logger.warn(`${label} 저장본 갱신 실패`, errorSummary(err));
+      }
+    }
+    return result;
   }
 
   /** 미리보기 토큰: `<발급 ms>.<HMAC(발급 ms + 지문)>`. 비밀키는 프로세스마다 새로 만든다. */
@@ -620,10 +724,19 @@ export class CategoryService {
     });
   }
 
-  /** 성적: 3요청. semester(`YYYY-H`) 지정 시 해당 학기 행만 반환(이수학점 "전체" 합계 행은 유지). */
+  /**
+   * 성적: 3요청. 아카이브가 있으면 저장본(STALE_MS 안)을 쓰고, 없거나 오래됐으면 포털에서 읽어 저장한다(이번 학기 키).
+   * semester(`YYYY-H`) 지정 시 해당 학기 행만 반환(이수학점 "전체" 합계 행은 유지).
+   */
   async getGrades(opts: { semester?: string } = {}): Promise<Result<Grades>> {
     const term = opts.semester === undefined ? undefined : parseSemesterArg(opts.semester);
-    const result = await this.live(() => fetchGrades(this.session));
+    const current = currentAcademicTerm(this.now());
+    const result = await this.storedOrLive(
+      "성적",
+      this.archiveDb?.getGrades(current),
+      () => fetchGrades(this.session),
+      (db, data, fetchedAt) => db.replaceGrades(current, data, fetchedAt),
+    );
     if (!term) return result;
     const match = (r: { year?: number; semester?: string }): boolean =>
       r.year === term.year && r.semester === term.semester;
@@ -636,6 +749,28 @@ export class CategoryService {
         current: g.current.filter(match),
       },
     };
+  }
+
+  /**
+   * 저장본이 있고 STALE_MS 안이면 그것(요청 0, fetchedAt은 저장 시각). 아니면 포털에서 읽어 아카이브에 저장한다.
+   * 저장은 부가 기능이라 DB 잠금·디스크 오류로 실패해도 받아 온 결과는 돌려준다.
+   */
+  private async storedOrLive<T>(
+    label: string,
+    stored: { data: T; fetchedAt: string } | undefined,
+    fetcher: () => Promise<T>,
+    save: (db: ArchiveDb, data: T, fetchedAt: string) => unknown,
+  ): Promise<Result<T>> {
+    if (stored && !isStale(stored.fetchedAt, this.now())) return { data: stored.data, meta: { fetchedAt: stored.fetchedAt } };
+    const result = await this.live(fetcher);
+    if (this.archiveDb) {
+      try {
+        save(this.archiveDb, result.data, result.meta.fetchedAt);
+      } catch (err) {
+        this.logger.warn(`${label} 저장 실패`, errorSummary(err));
+      }
+    }
+    return result;
   }
 
   /** 포털에서 읽고, 읽기 시작 시각을 fetchedAt으로 붙인다. */

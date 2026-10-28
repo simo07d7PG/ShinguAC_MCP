@@ -29,7 +29,7 @@ for (const [i, c] of r.courses.entries()) {
       `notices=${JSON.stringify(c.notices)} materials=${JSON.stringify(c.materials)}${c.error ? ` ERROR=${c.error}` : ""}`,
   );
 }
-console.log(`  timetable=${JSON.stringify(r.timetable)} files=${JSON.stringify(r.files)} warnings=${r.warnings.length}`);
+console.log(`  timetable=${JSON.stringify(r.timetable)} enrolledCourses=${JSON.stringify(r.enrolledCourses)} grades=${JSON.stringify(r.grades)} files=${JSON.stringify(r.files)} warnings=${r.warnings.length}`);
 for (const w of r.warnings) console.log(`  warn: ${w.replace(/"[^"]*"/g, '"…"')}`);
 const stats = db.all<{ owner_type: string; n: number; bytes: number | null; done: number }>(
   "SELECT owner_type, COUNT(*) n, SUM(size) bytes, COUNT(local_path) done FROM attachments GROUP BY owner_type",

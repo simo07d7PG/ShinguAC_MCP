@@ -317,74 +317,95 @@ describe("CategoryService.getNotice", () => {
   });
 });
 
-describe("CategoryService.getAssignments (아카이브 상태)", () => {
-  it("상세를 읽지 않은 unknown 과제는 아카이브 DB의 저장 상태를 쓰고 포털 요청은 늘지 않는다", async () => {
-    const plain = await makeService().service.getAssignments();
-    const target = plain.data.find((a) => a.submitStatus === "unknown")!;
-    const baseline = requests.length;
-    requests = [];
+describe("CategoryService DB 우선 조회(시간표·수강 과목·성적)", () => {
+  const term = { year: 2026, semester: "2" };
+  const HOUR = 60 * 60 * 1000;
+  const at = (hours: number): Date => new Date(NOW.getTime() + hours * HOUR);
+  let db: ArchiveDb;
+  beforeEach(() => {
+    db = new ArchiveDb(":memory:");
+  });
+  afterEach(() => db.close());
 
-    const db = new ArchiveDb(join(root, "eclass.db"));
-    try {
-      db.upsertCourse({ lectureSeq: target.lectureSeq, courseName: target.courseName, year: 2026, semester: "2" }, "2026-10-26T12:00:00+09:00");
-      db.upsertAssignment(
-        {
-          reportSeq: target.reportSeq,
-          lectureSeq: target.lectureSeq,
-          title: target.title,
-          startAt: null,
-          dueAt: target.dueAt,
-          extendedDueAt: target.extendedDueAt,
-          penaltyNote: null,
-          contentHtml: "",
-          contentText: "",
-          submitStatus: "submitted",
-        },
-        "2026-10-26T12:00:00+09:00",
-      );
-      const res = await makeService(NOW, db).service.getAssignments();
-      expect(requests).toHaveLength(baseline);
-      const same = (a: { reportSeq: string }): boolean => a.reportSeq === target.reportSeq;
-      expect(res.data.filter(same).every((a) => a.submitStatus === "submitted")).toBe(true);
-      // 저장된 상태가 없는 unknown은 그대로 unknown
-      const unknownLeft = (list: typeof res.data): number => list.filter((a) => a.submitStatus === "unknown" && !same(a)).length;
-      expect(unknownLeft(res.data)).toBe(unknownLeft(plain.data));
-    } finally {
-      db.close();
-    }
+  it("getTimetable: 24시간 안이면 저장본, 지나면 포털에서 다시 읽어 저장", async () => {
+    await makeService(NOW, db).service.getTimetable();
+    requests = [];
+    expect((await makeService(at(23), db).service.getTimetable()).meta.fetchedAt).toBe("2026-10-26T12:00:00+09:00");
+    expect(requests).toHaveLength(0);
+    const stale = await makeService(at(25), db).service.getTimetable();
+    expect(paths("GET", "/SSE/SSE013R/SSE013R")).toHaveLength(1);
+    expect(stale.meta.fetchedAt).toBe("2026-10-27T13:00:00+09:00");
+    expect(db.getTimetable(term)?.fetchedAt).toBe("2026-10-27T13:00:00+09:00");
   });
 
-  it("저장된 미제출·기간 아님은 쓰지 않는다(저장 뒤에 바뀌었을 수 있음)", async () => {
-    const plain = await makeService().service.getAssignments();
-    const targets = plain.data.filter((a) => a.submitStatus === "unknown").slice(0, 2);
-    expect(targets).toHaveLength(2);
-    const db = new ArchiveDb(join(root, "eclass.db"));
-    try {
-      targets.forEach((t, i) => {
-        db.upsertCourse({ lectureSeq: t.lectureSeq, courseName: t.courseName, year: 2026, semester: "2" }, "2026-10-26T12:00:00+09:00");
-        db.upsertAssignment(
-          {
-            reportSeq: t.reportSeq,
-            lectureSeq: t.lectureSeq,
-            title: t.title,
-            startAt: null,
-            dueAt: t.dueAt,
-            extendedDueAt: t.extendedDueAt,
-            penaltyNote: null,
-            contentHtml: "",
-            contentText: "",
-            submitStatus: i === 0 ? "not_submitted" : "not_open",
-          },
-          "2026-10-26T12:00:00+09:00",
-        );
-      });
-      const res = await makeService(NOW, db).service.getAssignments();
-      for (const t of targets) {
-        expect(res.data.find((a) => a.reportSeq === t.reportSeq)?.submitStatus).toBe("unknown");
-      }
-    } finally {
-      db.close();
-    }
+  it("getCourses: 저장본이 없으면 연락처까지 읽어 저장하고, include_contacts=false면 연락처를 빼고 돌려준다", async () => {
+    const live = await makeService().service.getCourses({ includeContacts: false });
+    requests = [];
+    const { service } = makeService(NOW, db);
+    const lite = await service.getCourses({ includeContacts: false });
+    // 저장은 연락처 포함(진입·교수소개·수업계획서 과목당 3요청)
+    expect(paths("POST", "/eclass/clas/home")).toHaveLength(4);
+    expect(paths("GET", "/eclass/clas/info/intro/introView")).toHaveLength(4);
+    expect(lite.data).toEqual(live.data);
+    expect(lite.data.every((c) => Object.keys(c.professor).join() === "name")).toBe(true);
+    expect(db.getCourses(term)!.data.find((c) => c.courseName === "UI화면설계")?.professor.email).toBe("user@example.com");
+
+    requests = [];
+    const full = await service.getCourses({ includeContacts: true });
+    const liteAgain = await service.getCourses({ includeContacts: false });
+    expect(requests).toHaveLength(0);
+    expect(full.meta.fetchedAt).toBe("2026-10-26T12:00:00+09:00");
+    expect(full.data.find((c) => c.courseName === "UI화면설계")?.professor.email).toBe("user@example.com");
+    expect(liteAgain.data).toEqual(live.data);
+
+    const stale = await makeService(at(25), db).service.getCourses();
+    expect(paths("GET", "/SSJ/SSJ018P/SSJ018P")).toHaveLength(1);
+    expect(stale.meta.fetchedAt).toBe("2026-10-27T13:00:00+09:00");
+    expect(db.getCourses(term)?.fetchedAt).toBe("2026-10-27T13:00:00+09:00");
+  });
+
+  it("getCourses: 비어 있는 저장본은 다시 읽는다", async () => {
+    db.replaceCourses(term, [], "2026-10-26T11:00:00+09:00");
+    const res = await makeService(NOW, db).service.getCourses();
+    expect(paths("GET", "/SSJ/SSJ018P/SSJ018P")).toHaveLength(1);
+    expect(res.data.length).toBeGreaterThan(0);
+    expect(db.getCourses(term)?.data).toEqual(res.data);
+  });
+
+  it("getCourses: 저장이 실패해도 결과는 돌려준다", async () => {
+    db.replaceCourses = () => {
+      throw new Error("database is locked");
+    };
+    const res = await makeService(NOW, db).service.getCourses();
+    expect(res.data.length).toBeGreaterThan(0);
+  });
+
+  it("getGrades: 저장본(요청 0)에도 semester 필터를 적용하고, 지나면 다시 읽어 저장", async () => {
+    const live = await makeService().service.getGrades({ semester: "2026-1" });
+    requests = [];
+    const { service } = makeService(NOW, db);
+    const all = await service.getGrades();
+    expect(requests).toHaveLength(3);
+    expect(db.getGrades(term)?.data).toEqual(all.data);
+
+    requests = [];
+    const filtered = await service.getGrades({ semester: "2026-1" });
+    expect(requests).toHaveLength(0);
+    expect(filtered.data).toEqual(live.data);
+    expect(filtered.meta.fetchedAt).toBe("2026-10-26T12:00:00+09:00");
+    expect(filtered.data.current).toHaveLength(0);
+    expect(filtered.data.credits.every((c) => c.total || (c.year === 2026 && c.semester === "1"))).toBe(true);
+
+    const stale = await makeService(at(25), db).service.getGrades();
+    expect(requests).toHaveLength(3);
+    expect(stale.meta.fetchedAt).toBe("2026-10-27T13:00:00+09:00");
+  });
+
+  it("아카이브가 없으면 매번 포털(기존 동작)", async () => {
+    const { service } = makeService();
+    await service.getGrades();
+    await service.getGrades();
+    expect(requests).toHaveLength(6);
   });
 });
 

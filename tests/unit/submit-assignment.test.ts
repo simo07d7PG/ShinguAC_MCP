@@ -9,6 +9,7 @@ import { HttpClient } from "../../src/http/http-client.js";
 import { RequestQueue } from "../../src/queue/request-queue.js";
 import type { Assignment, SubmitResult } from "../../src/schema/index.js";
 import { CategoryService, type SubmitOptions } from "../../src/service/category-service.js";
+import { ArchiveDb, isStale } from "../../src/store/archive-db.js";
 
 
 const fixture = (name: string): string => readFileSync(new URL(`../fixtures/${name}`, import.meta.url), "utf8");
@@ -131,7 +132,7 @@ async function route(r: Recorded): Promise<Response> {
   }
 }
 
-function makeService(): { service: CategoryService } {
+function makeService(db?: ArchiveDb): { service: CategoryService } {
   const fetchMock = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input));
     const method = init?.method ?? "GET";
@@ -156,7 +157,8 @@ function makeService(): { service: CategoryService } {
   });
   const session = new SessionManager({ client, login: vi.fn(async () => {}), loadConfig });
   const logger = { debug: () => {}, info: () => {}, warn: () => {} };
-  return { service: new CategoryService({ session, client, now: () => now, logger }) };
+  const archive = db ? { archive: { db, dbPath: ":memory:", filesDir: join(root, "files") } } : {};
+  return { service: new CategoryService({ session, client, now: () => now, logger, ...archive }) };
 }
 
 const sent = (path: string): Recorded[] => requests.filter((r) => r.path === path);
@@ -352,6 +354,67 @@ describe("submitAssignment: 신규 제출", () => {
     const res = await previewThenSubmit(service, base);
     expect(res).toMatchObject({ submitted: true, verified: false });
     expect(res.warnings.join(" ")).toContain("다시 보내지 말고");
+  });
+});
+
+describe("submitAssignment: 아카이브 저장본", () => {
+  const T = "2026-10-26T12:00:00+09:00";
+  let db: ArchiveDb;
+  beforeEach(() => {
+    db = new ArchiveDb(":memory:");
+    db.upsertCourse({ lectureSeq: "27962", courseName: "UI화면설계", year: 2026, semester: "2" }, T);
+    db.upsertAssignment(
+      {
+        reportSeq: "34771",
+        lectureSeq: "27962",
+        title: "과제",
+        startAt: null,
+        dueAt: "2026-10-28T00:00:00+09:00",
+        extendedDueAt: null,
+        penaltyNote: null,
+        contentHtml: "",
+        contentText: "",
+        submitStatus: "not_submitted",
+        scored: false,
+      },
+      T,
+    );
+  });
+  afterEach(() => db.close());
+
+  it("미리보기는 저장본을 바꾸지 않고, 보낸 제출은 제출 상태 + 오래된 것으로 표시한다", async () => {
+    const { service } = makeService(db);
+    const preview = await service.submitAssignment(base);
+    expect(db.getAssignmentDetail("34771")).toMatchObject({ submitStatus: "not_submitted", fetchedAt: T });
+    const res = await service.submitAssignment({ ...base, confirmToken: preview.confirmToken });
+    expect(res.submitted).toBe(true);
+    expect(sent(SUBMIT)).toHaveLength(1);
+    const saved = db.getAssignmentDetail("34771")!;
+    expect(saved.submitStatus).toBe("submitted");
+    expect(isStale(saved.fetchedAt, now)).toBe(true);
+    // 다음 get_assignment는 포털에서 다시 읽고 저장한다
+    requests = [];
+    const detail = await service.getAssignment({ reportSeq: "34771" });
+    expect(sent("/eclass/clas/room/homework/homeworkDetail")).toHaveLength(1);
+    expect(detail.data.submitStatus).toBe("submitted");
+    expect(db.getAssignmentDetail("34771")?.fetchedAt).toBe(T);
+  });
+
+  it("전송됐지만 확인 못 했으면 상태는 두고 오래된 것으로만 표시하고, 반영되지 않은 제출(오류)은 표시하지 않는다", async () => {
+    state.breakVerify = true;
+    const sentButUnverified = await previewThenSubmit(makeService(db).service, base);
+    expect(sentButUnverified).toMatchObject({ submitted: true, verified: false });
+    const saved = db.getAssignmentDetail("34771")!;
+    expect(saved.submitStatus).toBe("not_submitted");
+    expect(isStale(saved.fetchedAt, now)).toBe(true);
+
+    db.upsertAssignment(
+      { reportSeq: "34771", lectureSeq: "27962", title: "과제", startAt: null, dueAt: null, extendedDueAt: null, penaltyNote: null, contentHtml: "", contentText: "", submitStatus: "not_submitted" },
+      T,
+    );
+    state = { ...state, status: "not_submitted", breakVerify: false, accept: false };
+    await expect(previewThenSubmit(makeService(db).service, base)).rejects.toThrow(/제출 확인 실패/);
+    expect(db.getAssignmentDetail("34771")).toMatchObject({ submitStatus: "not_submitted", fetchedAt: T });
   });
 });
 
