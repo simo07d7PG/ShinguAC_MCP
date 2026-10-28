@@ -102,12 +102,12 @@ Windows에서는 `C:\Users\<사용자>\.shingu-mcp\config.json`입니다.
 |---|---|---|---|
 | `get_assignments` | `due_within_days`(선택, 0~365): 지금부터 N일 이내 마감만 | 과목, 제목, 마감, 내 제출 상태 | 7일 범위 약 15초 (첫 호출 로그인 포함) |
 | `get_assignment` | `report_seq`(필수), `lecture_seq`(선택) | 과제 한 건의 본문 전체·첨부파일(이름·다운로드 URL)·제출/연장기한·감점 안내·내 제출 상태 | 약 2초 |
-| `get_timetable` | `week`(선택, `YYYY-MM-DD`): 이 날짜가 속한 주의 날짜를 항목에 붙임 | 요일, 교시, 과목, 교수, 강의실, 날짜 | 약 0.3초 |
+| `get_timetable` | `week`(선택, `YYYY-MM-DD`): 이 날짜가 속한 주의 날짜를 항목에 붙임 | 요일, 교시, 과목, 교수, 강의실, 날짜. **저장된 시간표**를 돌려주고(`fetchedAt`=저장 시각), `sync_eclass` 때 갱신. 이번 학기 저장본이 없을 때만 포털에서 읽어 저장 | 즉시(저장본), 처음 약 0.3초 |
 | `get_courses` | `include_contacts`(선택, 기본 false): 교수 연락처 포함 | 수강 과목, 담당 교수 (옵션: 이메일, 전화, 연구실) | 약 1.2초 (연락처 포함 시 과목당 약 7초 추가) |
 | `get_notices` | `category`(`univ`/`scholarship`/`eclass`), `limit`(1~100, 기본 20), `include_eclass`(기본 false) | 공지 목록 (최신순) | 약 0.4초 |
 | `get_notice` | `id`: `get_notices` 결과의 id | 공지 본문, 첨부파일 목록 | 약 0.7초 |
 | `get_grades` | `semester`(선택, `YYYY-H` 예: `2026-1`) | 학기별 성적, 이수구분별 학점, 이번 학기 과목별 성적 | 약 1.5초 |
-| `sync_eclass` | `download_files`(선택, 기본 true), `full`(선택, 기본 false: 증분) | 과목별 과제·제출·수업공지·자료실 신규/갱신 건수, 첨부 다운로드 수, DB·파일 경로 | 첫 실행 수 분(첨부 크기에 따라), 이후 증분 |
+| `sync_eclass` | `download_files`(선택, 기본 true), `full`(선택, 기본 false: 증분) | 이번 학기 시간표 갱신 결과, 과목별 과제·제출·수업공지·자료실 신규/갱신 건수, 첨부 다운로드 수, DB·파일 경로 | 첫 실행 수 분(첨부 크기에 따라), 이후 증분 |
 | `search_archive` | `kind`(`assignments`/`posts`, 기본 assignments), `course`·`query`(부분 일치), `board`(`notice`/`material`), `status`(`submitted`/`not_submitted`/`not_open`), `due_from`·`due_to`(`YYYY-MM-DD`, 연장기한 우선), `limit`(1~100, 기본 20) | 저장된 과제(내 제출 포함)·게시글과 본문 발췌(300자), 첨부의 로컬 파일 경로. 포털에 요청하지 않음 | 즉시 |
 | `submit_assignment` | `report_seq`·`title`·`content`(필수), `lecture_seq`·`file_path`(절대 경로, 1개)·`confirm_token`(선택) | 토큰 없이 호출하면 미리보기(대상 과제, 마감·연장 감점, 덮어쓰기 경고, 기존 첨부)와 `confirmToken`. 그 토큰을 넣어 다시 호출하면 제출하고, 포털을 다시 읽어 `verified`로 반영 여부를 표시 | 미리보기 약 2초 |
 
@@ -153,6 +153,7 @@ Windows에서는 `C:\Users\<사용자>\.shingu-mcp\config.json`입니다.
 | `submissions` | 내가 제출한 과제의 제목·내용(`content_html`/`content_text`) |
 | `posts` | 수업공지(`board='notice'`)·자료실(`board='material'`): 제목, 등록일시, 작성자, 본문 전체(`body_html`/`body_text`) |
 | `attachments` | 첨부(과제·내 제출·게시글 공통): 파일명, 원본 링크, 로컬 경로(`files` 기준), 크기, sha256 |
+| `timetables` / `timetable_entries` | 학기별 시간표 동기화 시각 / 요일·교시·시작·종료·과목·교수·건물·강의실 |
 
 `search_archive`로 Claude에게 바로 물어볼 수 있습니다. 예: "아카이브에서 UI화면설계 미제출 과제 찾아줘", "자료실에서 '색채' 들어간 글 보여줘", "11월 첫 주 마감 과제 알려줘". 결과의 첨부는 원본 링크 없이 내려받은 파일 경로만 보여 줍니다.
 
@@ -173,6 +174,7 @@ WHERE p.board = 'material' ORDER BY p.posted_at DESC;
 
 동작:
 
+- 동기화할 때마다 이번 학기 시간표를 한 번 읽어 저장합니다(요청 1회). 시간표 조회가 실패해도 E클래스 동기화는 계속하고 저장된 시간표는 그대로 둡니다.
 - 기본은 **증분**입니다. 마감(연장 포함)이 하루 이상 지난 과제와 등록된 지 14일이 넘은 저장 게시글은 다시 읽지 않습니다. 최근 14일 안에 올라온 글은 증분에서도 다시 읽어 수정됐으면 갱신합니다(바뀌지 않았으면 갱신·재다운로드 없음). 더 오래된 글의 수정까지 반영하려면 `full: true`로 실행하세요.
 - 실측(2026-10-27, 강의 2개: 과제 31·게시글 28·첨부 47건 545MB): 첫 실행 목록·본문 저장 약 48초, 첨부 다운로드 약 5분(중복 제거 후 디스크 317MB). 이후 증분 실행은 수십 초입니다.
 - 첨부는 조회와 **별도의 다운로드 큐**로 하나씩 받습니다. 그래서 다운로드 중에도 다른 도구(과제·공지 조회 등)는 기다리지 않고 동작합니다(포털 동시 요청은 최대 2). 한 건당 최대 10분을 기다리고, 실패한 첨부는 다음 동기화에서 다시 받습니다. 중단돼 남은 임시 파일(`*.part`)은 다음 동기화 시작 때 지웁니다.

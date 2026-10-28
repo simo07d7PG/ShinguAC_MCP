@@ -43,6 +43,8 @@ let homeworkList: string;
 /** 지정하면 모든 과제 상세를 이 화면으로, 제출 폼을 editModal로 돌려준다. */
 let detailOverride: string | undefined;
 let editModal: string;
+/** true면 시간표 화면이 503(시간표 실패가 E클래스 동기화를 막지 않는지 확인). */
+let timetableDown = false;
 /** 요청마다 불린다(취소 시점 지정용). */
 let onRequest: ((r: Recorded) => void) | undefined;
 
@@ -51,6 +53,9 @@ function route(r: Recorded): Response {
   switch (`${r.method} ${r.path}`) {
     case "GET /eclass/home":
       return html(fixture("eclass/home-2026-2.html"));
+    case "GET /SSE/SSE013R/SSE013R":
+      if (timetableDown) return new Response("down", { status: 503 });
+      return html(fixture("timetable/SSE013R.html"));
     case "POST /eclass/clas/home":
       return html(fixture("eclass/clas-home.html"));
     case "GET /eclass/clas/room/homework/homeworkList":
@@ -147,6 +152,38 @@ const downloads = (): number => count("/01shingu/eClassDown.jsp") + count("/file
 afterEach(async () => {
   db.close();
   await rm(root, { recursive: true, force: true });
+});
+
+describe("ArchiveSync 시간표", () => {
+  beforeEach(() => {
+    timetableDown = false;
+  });
+
+  it("동기화 때 이번 학기 시간표를 1요청으로 저장하고, 다시 하면 same", async () => {
+    const service = makeService();
+    const first = await service.syncArchive({ downloadFiles: false });
+    expect(requests.filter((r) => r.path === "/SSE/SSE013R/SSE013R").map((r) => [r.query.get("Yy"), r.query.get("Haggi")])).toEqual([
+      ["2026", "2"],
+    ]);
+    expect(first.timetable).toMatchObject({ status: "new" });
+    const n = (first.timetable as { entries: number }).entries;
+    expect(n).toBeGreaterThan(0);
+    expect(db.getTimetable({ year: 2026, semester: "2" })!.entries).toHaveLength(n);
+    const second = await service.syncArchive({ downloadFiles: false });
+    expect(second.timetable).toEqual({ entries: n, status: "same" });
+  });
+
+  it("시간표가 실패해도 E클래스 동기화는 계속하고 경고만 남긴다(저장본 유지)", async () => {
+    const service = makeService();
+    await service.syncArchive({ downloadFiles: false });
+    const saved = db.getTimetable({ year: 2026, semester: "2" })!;
+    timetableDown = true;
+    const res = await service.syncArchive({ downloadFiles: false });
+    expect(res.timetable).toMatchObject({ status: "failed" });
+    expect(res.warnings.some((w) => w.includes("시간표"))).toBe(true);
+    expect(res.courses.map((c) => c.lectureSeq).sort()).toEqual(["27962", "28153"]);
+    expect(db.getTimetable({ year: 2026, semester: "2" })).toEqual(saved);
+  });
 });
 
 describe("ArchiveSync (sync_eclass)", () => {

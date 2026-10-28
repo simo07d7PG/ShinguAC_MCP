@@ -26,6 +26,13 @@ export const SyncSummarySchema = z.object({
   warnings: z.array(z.string()),
   dbPath: z.string(),
   filesDir: z.string(),
+  /** 이번 학기 시간표 갱신 결과. */
+  timetable: z
+    .union([
+      z.object({ entries: z.number().int(), status: z.enum(["new", "updated", "same"]) }),
+      z.object({ status: z.literal("failed"), error: z.string() }),
+    ])
+    .optional(),
   /** 도중에 취소됐으면 true. 그때까지 저장한 것은 남는다. */
   cancelled: z.boolean().optional(),
 });

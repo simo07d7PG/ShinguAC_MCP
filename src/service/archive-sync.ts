@@ -15,6 +15,7 @@ import { judgeSubmission, type FileDetail, type SubmitForm } from "../parsers/su
 import { enterLecture, fetchEclassBoardAll, fetchEclassBoardPost, fetchEclassHome, fetchHomeworkList } from "../portal/eclass.js";
 import { currentAcademicTerm } from "../portal/semester.js";
 import { fetchFileInfo, fetchHomeworkDetailHtml, fetchSubmissionForm } from "../portal/submit.js";
+import { fetchTimetable } from "../portal/timetable.js";
 import { PORTAL_ORIGIN } from "../portal/urls.js";
 import type { ArchiveDb, Board, PendingAttachment } from "../store/archive-db.js";
 import { BOARD_IDS } from "../store/archive-db.js";
@@ -72,6 +73,8 @@ export interface SyncSummary {
   warnings: string[];
   dbPath: string;
   filesDir: string;
+  /** 이번 학기 시간표 갱신 결과. 취소로 시작하지 못했으면 없다. */
+  timetable?: { entries: number; status: "new" | "updated" | "same" } | { status: "failed"; error: string };
   /** 도중에 취소됐으면 true. 그때까지 저장한 것은 남는다. */
   cancelled?: boolean;
 }
@@ -174,6 +177,8 @@ export class ArchiveSync {
       const courses: CourseSyncSummary[] = [];
       let skippedEmptyCourses = 0;
       let cancelled = signal?.aborted ?? false;
+      const timetable = cancelled ? undefined : await this.syncTimetable(term, warnings);
+      cancelled ||= signal?.aborted ?? false;
       const lectures = cancelled ? [] : await this.eclassLock.run(() => fetchEclassHome(this.session, term));
       progress.addTotal(lectures.length, `강의 ${lectures.length}개`);
       for (const lecture of lectures) {
@@ -229,9 +234,27 @@ export class ArchiveSync {
         warnings,
         dbPath: this.dbPath,
         filesDir: this.filesDir,
+        ...(timetable ? { timetable } : {}),
         ...(cancelled ? { cancelled: true } : {}),
       };
     });
+  }
+
+  /** 이번 학기 시간표(요청 1회). 실패해도 E클래스 동기화는 계속하고 경고만 남긴다(자격증명 오류는 멈춤). */
+  private async syncTimetable(
+    term: { year: number; semester: "1" | "2" },
+    warnings: string[],
+  ): Promise<NonNullable<SyncSummary["timetable"]>> {
+    try {
+      const page = await fetchTimetable(this.session, term);
+      const status = this.db.replaceTimetable(term, page.entries, nowKst(this.now()));
+      return { entries: page.entries.length, status };
+    } catch (err) {
+      if (isFatal(err)) throw err;
+      const error = errorSummary(err);
+      warnings.push(`시간표를 갱신하지 못했습니다(저장된 시간표는 그대로): ${error}`);
+      return { status: "failed", error };
+    }
   }
 
   /** 이전 동기화가 중단되며 남긴 다운로드 임시 파일을 지운다. 실패는 무시한다(다음 동기화에서 다시 시도). */

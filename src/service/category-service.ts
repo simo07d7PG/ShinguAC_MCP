@@ -212,12 +212,22 @@ export class CategoryService {
     return { ...result, data: result.data.filter((a) => inRange(a.extendedDueAt ?? a.dueAt, from, to)) };
   }
 
-  /** 시간표: 1요청. */
-  getTimetable(): Promise<Result<TimetableEntry[]>> {
-    return this.live(async () => {
-      const page = await fetchTimetable(this.session, currentAcademicTerm(this.now()));
-      return page.entries;
-    });
+  /**
+   * 시간표: 아카이브에 이번 학기 저장본이 있으면 그것(요청 0, fetchedAt은 저장 시각, 갱신은 sync_eclass).
+   * 저장본이 없거나 비어 있을 때(새 학기 수강신청 전후 등)만 포털에서 1요청으로 읽어 저장한다. 아카이브가 없으면 매번 포털.
+   */
+  async getTimetable(): Promise<Result<TimetableEntry[]>> {
+    const term = currentAcademicTerm(this.now());
+    const stored = this.archiveDb?.getTimetable(term);
+    if (stored && stored.entries.length > 0) return { data: stored.entries, meta: { fetchedAt: stored.fetchedAt } };
+    const result = await this.live(async () => (await fetchTimetable(this.session, term)).entries);
+    try {
+      this.archiveDb?.replaceTimetable(term, result.data, result.meta.fetchedAt);
+    } catch (err) {
+      // 저장은 부가 기능이다. DB 잠금·디스크 오류로 실패해도 받아 온 시간표는 돌려준다.
+      this.logger.warn("시간표 저장 실패", errorSummary(err));
+    }
+    return result;
   }
 
   /** 수강 과목: 1(SSJ018P) + 1(E클래스 홈) [+ 매칭 과목당 3(진입·교수소개·수업계획서) — includeContacts]. */

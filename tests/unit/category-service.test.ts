@@ -170,6 +170,52 @@ describe("CategoryService 기타 범주", () => {
     expect(res.meta.fetchedAt).toBe("2026-10-26T12:00:00+09:00");
   });
 
+  it("getTimetable(아카이브 있음): 저장본이 없을 때만 포털에서 읽어 저장하고, 이후는 요청 없이 저장본", async () => {
+    const db = new ArchiveDb(":memory:");
+    try {
+      const { service } = makeService(NOW, db);
+      const first = await service.getTimetable();
+      expect(paths("GET", "/SSE/SSE013R/SSE013R")).toHaveLength(1);
+      expect(db.getTimetable({ year: 2026, semester: "2" })?.entries).toEqual(first.data);
+
+      requests = [];
+      const second = await service.getTimetable();
+      expect(requests).toHaveLength(0);
+      expect(second.data).toEqual(first.data);
+      expect(second.meta.fetchedAt).toBe(first.meta.fetchedAt);
+
+      // 다른 학기(학기가 바뀐 뒤)는 저장본이 없으므로 다시 포털
+      const next = makeService(new Date("2027-03-02T12:00:00+09:00"), db).service;
+      await next.getTimetable();
+      const req = paths("GET", "/SSE/SSE013R/SSE013R")[0]!;
+      expect([new URL(req.url).searchParams.get("Yy"), new URL(req.url).searchParams.get("Haggi")]).toEqual(["2027", "1"]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("getTimetable: 저장본이 비어 있으면 포털에서 다시 읽고, 저장이 실패해도 결과는 돌려준다", async () => {
+    const db = new ArchiveDb(":memory:");
+    try {
+      db.replaceTimetable({ year: 2026, semester: "2" }, [], "2026-10-01T09:00:00+09:00");
+      const { service } = makeService(NOW, db);
+      const res = await service.getTimetable();
+      expect(paths("GET", "/SSE/SSE013R/SSE013R")).toHaveLength(1);
+      expect(res.data.length).toBeGreaterThan(0);
+      expect(db.getTimetable({ year: 2026, semester: "2" })?.entries).toEqual(res.data);
+
+      const broken = new ArchiveDb(":memory:");
+      broken.replaceTimetable = () => {
+        throw new Error("database is locked");
+      };
+      const viaBroken = await makeService(NOW, broken).service.getTimetable();
+      expect(viaBroken.data).toEqual(res.data);
+      broken.close();
+    } finally {
+      db.close();
+    }
+  });
+
   it("getCourses: E클래스 과목만 lectureSeq·연락처 병합, includeContacts=false면 진입 안 함", async () => {
     const { service } = makeService();
     const res = await service.getCourses();

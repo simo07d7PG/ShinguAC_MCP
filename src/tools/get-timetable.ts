@@ -28,6 +28,8 @@ export function registerGetTimetable(server: McpServer, getService: GetService):
       description:
         "이번 학기 주간 시간표(요일·교시·과목·교수·강의실)를 반환한다. 시간표는 학기 동안 고정이므로 " +
         "week는 각 항목에 붙는 실제 날짜(date)만 바꾼다. " +
+        "로컬에 저장된 시간표를 돌려주며(fetchedAt은 저장 시각) 포털에서 새로 읽으려면 sync_eclass를 실행한다. " +
+        "이번 학기 저장본이 없거나 비어 있을 때만 포털에서 읽어 저장한다. " +
         SOURCE_NOTE,
       inputSchema: {
         week: z

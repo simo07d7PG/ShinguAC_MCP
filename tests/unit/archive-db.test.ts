@@ -92,7 +92,7 @@ describe("ArchiveDb", () => {
       first.upsertCourse({ lectureSeq: "1", courseName: "자료구조", year: 2026, semester: "2" }, T);
       first.close();
       const again = new ArchiveDb(path);
-      expect(again.all("PRAGMA user_version")).toEqual([{ user_version: 1 }]);
+      expect(again.all("PRAGMA user_version")).toEqual([{ user_version: 2 }]);
       expect(again.all("SELECT course_name FROM courses")).toEqual([{ course_name: "자료구조" }]);
       again.all("PRAGMA user_version = 99");
       again.close();
@@ -100,5 +100,51 @@ describe("ArchiveDb", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it("v1 DB를 열면 시간표 테이블만 추가하고 기존 데이터는 둔다", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "archive-db-"));
+    try {
+      const path = join(dir, "eclass.db");
+      const first = new ArchiveDb(path);
+      first.upsertCourse({ lectureSeq: "1", courseName: "자료구조", year: 2026, semester: "2" }, T);
+      // v1 상태로 되돌린다(시간표 테이블 없음)
+      first.all("DROP TABLE timetable_entries");
+      first.all("DROP TABLE timetables");
+      first.all("PRAGMA user_version = 1");
+      first.close();
+      const again = new ArchiveDb(path);
+      expect(again.all("PRAGMA user_version")).toEqual([{ user_version: 2 }]);
+      expect(again.all("SELECT course_name FROM courses")).toEqual([{ course_name: "자료구조" }]);
+      expect(again.getTimetable({ year: 2026, semester: "2" })).toBeUndefined();
+      again.close();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ArchiveDb 시간표", () => {
+  const term = { year: 2026, semester: "2" };
+  const mon = { day: 1, period: 1, startTime: "09:00", endTime: "09:50", courseName: "자료구조", professorName: "김교수", building: "본관", room: "101" };
+  const tue = { day: 2, period: 3, courseName: "UI화면설계", professorName: "이교수", roomAlias: "실습실" };
+
+  it("동기화 전에는 undefined, 비어 있는 학기는 빈 배열로 구분한다", () => {
+    expect(db.getTimetable(term)).toBeUndefined();
+    expect(db.replaceTimetable(term, [], T)).toBe("new");
+    expect(db.getTimetable(term)).toEqual({ entries: [], fetchedAt: T });
+  });
+
+  it("new → same(fetchedAt만 갱신) → updated, 선택 필드는 없으면 생략", () => {
+    expect(db.replaceTimetable(term, [mon, tue], T)).toBe("new");
+    const later = "2026-10-27T09:00:00+09:00";
+    expect(db.replaceTimetable(term, [mon, tue], later)).toBe("same");
+    expect(db.getTimetable(term)).toEqual({ entries: [mon, tue], fetchedAt: later });
+    expect(db.replaceTimetable(term, [mon, { ...tue, period: 4 }], later)).toBe("updated");
+    expect(db.getTimetable(term)!.entries[1]).toEqual({ ...tue, period: 4 });
+    expect(db.replaceTimetable(term, [mon], later)).toBe("updated");
+    expect(db.getTimetable(term)!.entries).toEqual([mon]);
+    // 다른 학기는 따로
+    expect(db.getTimetable({ year: 2026, semester: "1" })).toBeUndefined();
   });
 });

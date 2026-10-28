@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import type { TimetableEntry } from "../schema/timetable.js";
 
 /** 게시판 종류. 수업공지 boardId=1, 자료실 boardId=3. */
 export type Board = "notice" | "material";
@@ -181,7 +182,59 @@ const MIGRATIONS: string[] = [
   CREATE INDEX assignments_lecture ON assignments(lecture_seq);
   CREATE INDEX attachments_pending ON attachments(local_path) WHERE local_path IS NULL;
   `,
+  // v2: 개인 시간표. timetables 행이 있으면 그 학기를 동기화한 적이 있다(항목이 0개여도).
+  `
+  CREATE TABLE timetables (
+    year       INTEGER NOT NULL,
+    semester   TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    PRIMARY KEY (year, semester)
+  );
+  CREATE TABLE timetable_entries (
+    year           INTEGER NOT NULL,
+    semester       TEXT NOT NULL,
+    position       INTEGER NOT NULL,
+    day            INTEGER NOT NULL,
+    period         INTEGER NOT NULL,
+    start_time     TEXT,
+    end_time       TEXT,
+    course_name    TEXT NOT NULL,
+    professor_name TEXT NOT NULL,
+    building       TEXT,
+    room           TEXT,
+    room_alias     TEXT,
+    PRIMARY KEY (year, semester, position),
+    FOREIGN KEY (year, semester) REFERENCES timetables(year, semester) ON DELETE CASCADE
+  );
+  `,
 ];
+
+/** 시간표 항목 ↔ DB 행. 비교·저장 모두 이 순서를 쓴다. */
+const TIMETABLE_COLUMNS = [
+  "day",
+  "period",
+  "start_time",
+  "end_time",
+  "course_name",
+  "professor_name",
+  "building",
+  "room",
+  "room_alias",
+] as const;
+
+function timetableRow(e: TimetableEntry): Array<string | number | null> {
+  return [
+    e.day,
+    e.period,
+    e.startTime ?? null,
+    e.endTime ?? null,
+    e.courseName,
+    e.professorName,
+    e.building ?? null,
+    e.room ?? null,
+    e.roomAlias ?? null,
+  ];
+}
 
 /**
  * E클래스 아카이브(SQLite). 과목·과제·내 제출·게시글(수업공지·자료실)·첨부 메타데이터를 저장한다.
@@ -592,6 +645,67 @@ export class ArchiveDb {
       }),
     );
     return { total: n, items };
+  }
+
+  /** 저장된 학기 시간표. 그 학기를 동기화한 적이 없으면 undefined(동기화했는데 비어 있으면 빈 배열). */
+  getTimetable(term: { year: number; semester: string }): { entries: TimetableEntry[]; fetchedAt: string } | undefined {
+    const head = this.db
+      .prepare("SELECT fetched_at FROM timetables WHERE year = ? AND semester = ?")
+      .get(term.year, term.semester) as { fetched_at: string } | undefined;
+    if (!head) return undefined;
+    const rows = this.db
+      .prepare(
+        `SELECT ${TIMETABLE_COLUMNS.join(", ")} FROM timetable_entries
+         WHERE year = ? AND semester = ? ORDER BY position`,
+      )
+      .all(term.year, term.semester) as Record<(typeof TIMETABLE_COLUMNS)[number], string | number | null>[];
+    const entries = rows.map((r) => {
+      const e: TimetableEntry = {
+        day: Number(r.day),
+        period: Number(r.period),
+        courseName: String(r.course_name),
+        professorName: String(r.professor_name),
+      };
+      if (r.start_time !== null) e.startTime = String(r.start_time);
+      if (r.end_time !== null) e.endTime = String(r.end_time);
+      if (r.building !== null) e.building = String(r.building);
+      if (r.room !== null) e.room = String(r.room);
+      if (r.room_alias !== null) e.roomAlias = String(r.room_alias);
+      return e;
+    });
+    return { entries, fetchedAt: head.fetched_at };
+  }
+
+  /**
+   * 학기 시간표를 통째로 바꾼다. 처음이면 "new", 항목이 바뀌었으면 "updated", 같으면 "same".
+   * 같아도 fetched_at은 갱신한다(마지막으로 포털과 맞춰 본 시각).
+   */
+  replaceTimetable(
+    term: { year: number; semester: string },
+    entries: TimetableEntry[],
+    fetchedAt: string,
+  ): "new" | "updated" | "same" {
+    return this.transaction(() => {
+      const prev = this.getTimetable(term);
+      const same =
+        prev !== undefined &&
+        prev.entries.length === entries.length &&
+        prev.entries.every((p, i) => JSON.stringify(timetableRow(p)) === JSON.stringify(timetableRow(entries[i]!)));
+      this.db
+        .prepare(
+          `INSERT INTO timetables (year, semester, fetched_at) VALUES (?, ?, ?)
+           ON CONFLICT (year, semester) DO UPDATE SET fetched_at = excluded.fetched_at`,
+        )
+        .run(term.year, term.semester, fetchedAt);
+      if (same) return "same";
+      this.db.prepare("DELETE FROM timetable_entries WHERE year = ? AND semester = ?").run(term.year, term.semester);
+      const insert = this.db.prepare(
+        `INSERT INTO timetable_entries (year, semester, position, ${TIMETABLE_COLUMNS.join(", ")})
+         VALUES (?, ?, ?, ${TIMETABLE_COLUMNS.map(() => "?").join(", ")})`,
+      );
+      entries.forEach((e, position) => insert.run(term.year, term.semester, position, ...timetableRow(e)));
+      return prev ? "updated" : "new";
+    });
   }
 
   /** 테스트·진단용 단순 조회. */
